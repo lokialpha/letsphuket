@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   noBtn?.addEventListener('click', () => {
-    warning.textContent = 'We can only serve guests 21 and up. Come back when it’s your time.';
+    warning.textContent = 'We can only serve guests 20 and up under Thai law. Come back when it’s your time.';
     page?.scrollTo({ top: 0, behavior: 'smooth' });
   });
 
