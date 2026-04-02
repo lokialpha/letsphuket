@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Informational cannabis guide. No online sales.">
+  <title>Let's Phuket | Cannabis Guide</title>
+  <link rel="stylesheet" href="client/assets/css/styles.css">
+
+  <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="shortcut icon" href="/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Let's Phuket" />
+  <link rel="manifest" href="/site.webmanifest" />
+</head>
+<body>
+  <div id="age-gate" class="age-gate">
+    <div class="age-card">
+      <p class="age-kicker">Stay lit, stay legal</p>
+      <h2>Are you 20 or older?</h2>
+      <p class="age-copy">We love sharing good flower, but Thai law only allows us to serve adults 20+. Confirm your age to enter Let's Phuket Cannabis Guide.</p>
+      <div class="age-actions">
+        <button id="age-yes" class="btn primary">Yes, I’m 20+</button>
+        <button id="age-no" class="btn ghost">Not yet</button>
+      </div>
+      <p id="age-warning" class="age-warning" aria-live="polite"></p>
+    </div>
+  </div>
+
+  <div id="page">
+    <header class="hero">
+      <nav class="nav">
+        <div class="brand">
+          <span class="brand-mark">🌿</span>
+          <span class="brand-name">Let’s Phuket</span>
+        </div>
+        <div class="nav-links">
+          <a href="#strains">Strains</a>
+          <a href="#merch">Brand</a>
+          <a href="#visit">Visit</a>
+        </div>
+        <a class="btn nav-cta" href="#strains">View strains</a>
+      </nav>
+
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <p class="eyebrow">Welcome to Phuket’s playful cannabis hideout</p>
+          <h1>Let’s Phuket Cannabis Guide</h1>
+          <p class="lede">Sun-washed buds, island terpenes, and a crew that keeps it breezy. Slide through for curated strains, fresh merch, and a vibe that feels like golden hour on the beach.</p>
+          <div class="hero-actions">
+            <a class="btn primary" href="#strains">Browse strains</a>
+            <a class="btn ghost" href="#visit">Find us</a>
+          </div>
+          <p class="hero-disclaimer">Informational content only. No cannabis products are sold through this website.</p>
+        </div>
+        <div class="hero-visual">
+          <div class="hero-badge">
+            <p>Featured strain</p>
+            <h3 id="featured-badge-name">Tea Time</h3>
+            <span id="featured-badge-terpenes">Linalool × Caryophyllene</span>
+          </div>
+          <div class="hero-card">
+            <p class="card-kicker">Featured today</p>
+            <h3 id="featured-card-name">Tea Time</h3>
+            <p id="featured-card-description" class="card-body">Earl grey aromatics, lemon zest, and a smooth calm that stays clear and chatty.</p>
+            <div class="card-stats">
+              <div><span class="label">Terpenes</span><strong id="featured-card-terpenes">Linalool · Caryophyllene</strong></div>
+              <div><span class="label">Mood&Aroma</span><strong id="featured-card-mood">Calm • Focused</strong></div>
+            </div>
+          </div>
+          <div class="floating-leaf leaf-a" aria-hidden="true"></div>
+          <div class="floating-leaf leaf-b" aria-hidden="true"></div>
+          <div class="floating-leaf leaf-c" aria-hidden="true"></div>
+        </div>
+      </div>
+      <div class="gradient-blob blob-1" aria-hidden="true"></div>
+      <div class="gradient-blob blob-2" aria-hidden="true"></div>
+    </header>
+
+    <main>
+      <section id="strains" class="section strains">
+        <div class="section-header strains-header">
+          <div class="strains-header-copy">
+            <p class="eyebrow">Strain Library</p>
+            <h2 id="strains-heading">Featured strains in Phuket</h2>
+            <p class="section-lede">A curated overview of popular cannabis strains commonly found in Phuket. For informational purposes only.</p>
+            <p class="strain-note">Effects described are anecdotal and for general reference only.</p>
+          </div>
+          <div id="strains-see-more-wrap" class="strains-see-more hidden">
+            <a class="btn ghost" href="client/pages/strains.html">See More</a>
+          </div>
+        </div>
+        <div id="strain-grid" class="strain-grid"></div>
+      </section>
+
+      <!-- <section id="merch" class="section merch">
+        <div class="section-header">
+          <p class="eyebrow">Brand drop</p>
+          <h2>Island T-shirts & gear</h2>
+          <p class="section-lede">Soft-wash cotton, beach-ready prints, and breathable fits for Phuket heat.</p>
+        </div>
+        <div id="merch-grid" class="merch-grid"></div>
+      </section> -->
+
+      <section id="visit" class="section visit">
+        <div class="visit-contact-only">
+          <p class="eyebrow">Contact</p>
+          <h2>Get in touch</h2>
+          <div class="contact-actions">
+            <a id="visit-whatsapp" class="btn primary" href="https://wa.me/66628590096" target="_blank" rel="noopener noreferrer">Contact via WhatsApp</a>
+          </div>
+          <p class="hero-disclaimer">In-store only, 20+ only, no online sales.</p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-brand">
+        <span class="brand-mark">🌿</span>
+        <span class="brand-name">Let’s Phuket</span>
+        <p class="footer-note">Serving adults 20+ in line with Thai cannabis regulations.</p>
+      </div>
+      <div class="footer-legal">
+        <p class="legal-title">Disclaimer / คำเตือน / မှတ်ချက်</p>
+        <div class="legal-grid">
+          <article class="legal-card">
+            <span class="lang-tag">EN</span>
+            <p>Products contain cannabis and are for adults 20+ only. Not for pregnant or breastfeeding persons, or students. No smoking or vaping in public spaces. Follow Thai Cannabis and Hemp Act B.E. 2565 and local regulations. Carry valid ID for age verification.</p>
+          </article>
+          <article class="legal-card">
+            <span class="lang-tag">TH</span>
+            <p>ผลิตภัณฑ์นี้มีส่วนผสมกัญชา จำหน่าย/ใช้ได้เฉพาะผู้มีอายุ 20 ปีขึ้นไป ไม่ขายให้ผู้ตั้งครรภ์ ให้นมบุตร หรือ นักเรียน ห้ามสูบหรือใช้ในที่สาธารณะ ปฏิบัติตามพระราชบัญญัติกัญชาและกัญชง พ.ศ.2565 และกฎท้องถิ่น โปรดพกบัตรประชาชนเพื่อยืนยันตัวตน</p>
+          </article>
+          <article class="legal-card">
+            <span class="lang-tag">MY</span>
+            <p>ဤထုတ်ကုန်များတွင် ကန္နဘိစ် ပါဝင်သည်။ အသက် ၂၀ နှစ်အထက်သာ ဝယ်ယူ/သုံးစွဲနိုင်သည်။ ကိုယ်ဝန်ဆောင်၊ နို့တိုက်နေသူ၊ ကျောင်းသားများကို မရောင်းပါ။ အများသူငါနေရာများတွင် မသုံးပါနှင့်။ ထိုင်းနိုင်ငံ ကန်နဘိစ်ဥပဒေ (၂၅၆၅) နှင့် ဒေသခံစည်းမျဉ်းများကို လိုက်နာပါ။ အသက်သက်သေခံ ကတ်ကို ယူဆောင်လာပါ။</p>
+          </article>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+  <script src="client/assets/js/script.js"></script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+.strains-page-header {
+  padding: 26px clamp(24px, 4vw, 60px) 0;
+}
+
+.strains-page-main {
+  padding-bottom: 72px;
+}
+
+.strains-page-main .section {
+  padding-top: 28px;
+}
+
+.strains-page-main .section-header h1 {
+  margin: 12px 0 6px;
+  font-size: clamp(1.8rem, 3vw, 2.4rem);
+}
+
+.strains-page-nav {
+  display: flex;
+  gap: 10px;
+}
+
+.strains-see-more,
+.strains-load-more {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+}

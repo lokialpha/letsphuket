@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Browse all published cannabis strains from Let's Phuket.">
+  <title>All Strains | Let's Phuket</title>
+  <link rel="stylesheet" href="../assets/css/styles.css">
+  <link rel="stylesheet" href="../assets/css/strains.css">
+
+  <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="shortcut icon" href="/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Let's Phuket" />
+  <link rel="manifest" href="/site.webmanifest" />
+</head>
+<body>
+  <div id="age-gate" class="age-gate">
+    <div class="age-card">
+      <p class="age-kicker">Stay lit, stay legal</p>
+      <h2>Are you 20 or older?</h2>
+      <p class="age-copy">This content is for adults 20+ under Thai law. Confirm your age to continue.</p>
+      <div class="age-actions">
+        <button id="age-yes" class="btn primary">Yes, I’m 20+</button>
+        <button id="age-no" class="btn ghost">Not yet</button>
+      </div>
+      <p id="age-warning" class="age-warning" aria-live="polite"></p>
+    </div>
+  </div>
+
+  <div id="page">
+    <header class="strains-page-header">
+      <nav class="nav">
+        <a class="brand" href="../../index.html">
+          <span class="brand-mark">🌿</span>
+          <span class="brand-name">Let’s Phuket</span>
+        </a>
+        <div class="strains-page-nav">
+          <a class="btn ghost top-back-btn" href="../../index.html#strains">Back to homepage</a>
+        </div>
+      </nav>
+    </header>
+
+    <main class="strains-page-main">
+      <section class="section strains">
+        <div class="section-header">
+          <p class="eyebrow">Strain Library</p>
+          <h1 id="all-strains-heading">All strains in Phuket</h1>
+          <p class="section-lede">Browse all published strains. Click any strain card for full detail.</p>
+        </div>
+        <div id="all-strain-grid" class="strain-grid"></div>
+        <div id="all-strains-load-more-wrap" class="strains-load-more hidden">
+          <button id="all-strains-load-more" class="btn ghost" type="button">Load more</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../../supabase-config.js"></script>
+  <script src="../assets/js/strains.js"></script>
+</body>
+</html>

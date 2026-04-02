@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Detailed cannabis strain profile from Let's Phuket.">
+  <title>Strain Detail | Let's Phuket</title>
+  <link rel="stylesheet" href="../assets/css/styles.css">
+  <link rel="stylesheet" href="../assets/css/strain.css">
+
+  <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="shortcut icon" href="/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Let's Phuket" />
+  <link rel="manifest" href="/site.webmanifest" />
+</head>
+<body>
+  <div id="age-gate" class="age-gate">
+    <div class="age-card">
+      <p class="age-kicker">Stay lit, stay legal</p>
+      <h2>Are you 20 or older?</h2>
+      <p class="age-copy">This content is for adults 20+ under Thai law. Confirm your age to continue.</p>
+      <div class="age-actions">
+        <button id="age-yes" class="btn primary">Yes, I’m 20+</button>
+        <button id="age-no" class="btn ghost">Not yet</button>
+      </div>
+      <p id="age-warning" class="age-warning" aria-live="polite"></p>
+    </div>
+  </div>
+
+  <div id="page">
+    <header class="detail-header">
+      <nav class="nav">
+        <a class="brand" href="../../index.html">
+          <span class="brand-mark">🌿</span>
+          <span class="brand-name">Let’s Phuket</span>
+        </a>
+        <div class="detail-nav-actions">
+          <a class="btn ghost top-back-btn" href="./strains.html">Back to strains</a>
+        </div>
+      </nav>
+    </header>
+
+    <main class="detail-main">
+      <section class="detail-panel">
+        <p id="detail-kicker" class="eyebrow">Strain profile</p>
+        <div class="detail-grid">
+          <div class="detail-media">
+            <img id="strain-image" src="/image/default.jpg" alt="Strain image" loading="lazy">
+          </div>
+          <div class="detail-copy">
+            <div class="detail-top">
+              <span id="strain-type" class="tag hybrid">Hybrid</span>
+            </div>
+            <h1 id="strain-name">Loading...</h1>
+            <p id="strain-description" class="detail-description">Preparing strain details.</p>
+            <div class="detail-specs">
+              <article class="detail-spec-card">
+                <h2>Terpenes</h2>
+                <p id="strain-terpenes">-</p>
+              </article>
+              <article class="detail-spec-card">
+                <h2>Mood&Aroma</h2>
+                <p id="strain-mood">-</p>
+              </article>
+            </div>
+            <p id="detail-note" class="detail-note">Effects are anecdotal and for informational reference only.</p>
+          </div>
+        </div>
+      </section>
+      <p id="detail-error" class="detail-error hidden" aria-live="polite"></p>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../../supabase-config.js"></script>
+  <script src="../assets/js/strain.js"></script>
+</body>
+</html>
