@@ -49,6 +49,12 @@
           <h1 id="all-strains-heading">All strains in Phuket</h1>
           <p class="section-lede">Browse all published strains. Click any strain card for full detail.</p>
         </div>
+        <div class="strain-filters" role="tablist" aria-label="Filter strains by type">
+          <button class="strain-filter-btn active" data-strain-filter="all" type="button" aria-pressed="true">All</button>
+          <button class="strain-filter-btn" data-strain-filter="sativa" type="button" aria-pressed="false">Sativa</button>
+          <button class="strain-filter-btn" data-strain-filter="indica" type="button" aria-pressed="false">Indica</button>
+          <button class="strain-filter-btn" data-strain-filter="hybrid" type="button" aria-pressed="false">Hybrid</button>
+        </div>
         <div id="all-strain-grid" class="strain-grid"></div>
         <div id="all-strains-load-more-wrap" class="strains-load-more hidden">
           <button id="all-strains-load-more" class="btn ghost" type="button">Load more</button>

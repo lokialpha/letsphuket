@@ -4,9 +4,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const noBtn = document.getElementById('age-no');
   const warning = document.getElementById('age-warning');
   const page = document.getElementById('page');
+  const strainFilterButtons = Array.from(document.querySelectorAll('[data-strain-filter]'));
 
   const defaultStrainImg = '/image/default.jpg';
   const HOMEPAGE_STRAIN_LIMIT = 10;
+  let homepageAllStrains = [];
+  let activeHomepageFilter = 'all';
 
   const FALLBACK_DATA = {
     strains: [
@@ -242,6 +245,25 @@ document.addEventListener('DOMContentLoaded', () => {
     return 'hybrid';
   }
 
+  function getFilteredStrains(strains, filterType) {
+    const list = Array.isArray(strains) ? strains : [];
+    if (filterType === 'all') return list;
+    return list.filter((strain) => normalizeType(strain.strain_type) === filterType);
+  }
+
+  function titleType(type) {
+    if (type === 'all') return 'All';
+    return type.charAt(0).toUpperCase() + type.slice(1);
+  }
+
+  function setActiveFilterUi(type) {
+    strainFilterButtons.forEach((btn) => {
+      const isActive = btn.dataset.strainFilter === type;
+      btn.classList.toggle('active', isActive);
+      btn.setAttribute('aria-pressed', String(isActive));
+    });
+  }
+
   function resolveImageUrl(value) {
     const raw = String(value || '').trim();
     if (!raw) return defaultStrainImg;
@@ -291,7 +313,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <span class="tag ${type}">${escapeHtml(type.charAt(0).toUpperCase() + type.slice(1))}</span>
             </div>
             <h3>${escapeHtml(strain.name)}</h3>
-            <p>${escapeHtml(strain.short_description || '')}</p>
+            <p class="strain-preview">${escapeHtml(strain.short_description || '')}</p>
             <div class="specs">
               <span>Terpenes: ${escapeHtml(terpenes)}</span>
               <span>Mood&Aroma: ${escapeHtml(strain.mood_aroma || '')}</span>
@@ -303,27 +325,34 @@ document.addEventListener('DOMContentLoaded', () => {
     }).join('');
 
     const heading = document.getElementById('strains-heading');
-    if (heading) heading.textContent = `${strains.length} featured strains in Phuket`;
+    if (heading) heading.textContent = `${strains.length} strains in Phuket`;
   }
 
-  function applyHomepageStrains(strains) {
-    const list = Array.isArray(strains) ? strains : [];
-    const preview = list.slice(0, HOMEPAGE_STRAIN_LIMIT);
+  function renderHomepageByFilter() {
+    const filtered = getFilteredStrains(homepageAllStrains, activeHomepageFilter);
+    const preview = filtered.slice(0, HOMEPAGE_STRAIN_LIMIT);
     renderStrains(preview);
 
     const heading = document.getElementById('strains-heading');
     if (heading) {
-      if (list.length > HOMEPAGE_STRAIN_LIMIT) {
-        heading.textContent = `Top ${HOMEPAGE_STRAIN_LIMIT} of ${list.length} strains in Phuket`;
+      if (activeHomepageFilter === 'all' && filtered.length > HOMEPAGE_STRAIN_LIMIT) {
+        heading.textContent = `Top ${HOMEPAGE_STRAIN_LIMIT} of ${filtered.length} strains in Phuket`;
+      } else if (activeHomepageFilter === 'all') {
+        heading.textContent = `${filtered.length} featured strains in Phuket`;
       } else {
-        heading.textContent = `${list.length} featured strains in Phuket`;
+        heading.textContent = `${filtered.length} ${titleType(activeHomepageFilter)} strains in Phuket`;
       }
     }
 
     const seeMoreWrap = document.getElementById('strains-see-more-wrap');
     if (seeMoreWrap) {
-      seeMoreWrap.classList.toggle('hidden', list.length <= HOMEPAGE_STRAIN_LIMIT);
+      seeMoreWrap.classList.toggle('hidden', filtered.length <= HOMEPAGE_STRAIN_LIMIT);
     }
+  }
+
+  function applyHomepageStrains(strains) {
+    homepageAllStrains = Array.isArray(strains) ? strains : [];
+    renderHomepageByFilter();
   }
 
   function applyFeaturedStrain(strains) {
@@ -533,5 +562,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  strainFilterButtons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const selectedType = String(btn.dataset.strainFilter || 'all').toLowerCase();
+      if (!['all', 'sativa', 'indica', 'hybrid'].includes(selectedType)) return;
+      activeHomepageFilter = selectedType;
+      setActiveFilterUi(activeHomepageFilter);
+      renderHomepageByFilter();
+    });
+  });
+
+  setActiveFilterUi(activeHomepageFilter);
   loadContent();
 });

@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const heading = document.getElementById('all-strains-heading');
   const loadMoreWrap = document.getElementById('all-strains-load-more-wrap');
   const loadMoreBtn = document.getElementById('all-strains-load-more');
+  const filterButtons = Array.from(document.querySelectorAll('[data-strain-filter]'));
 
   const defaultStrainImg = '/image/default.jpg';
   const PAGE_SIZE = 12;
@@ -29,6 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let allStrains = [];
   let visibleCount = 0;
+  let activeFilter = 'all';
 
   function setUnlocked() {
     gate.classList.add('hidden');
@@ -75,6 +77,24 @@ document.addEventListener('DOMContentLoaded', () => {
     return String(value ?? '').trim();
   }
 
+  function getFilteredStrains() {
+    if (activeFilter === 'all') return allStrains;
+    return allStrains.filter((strain) => normalizeType(strain.strain_type) === activeFilter);
+  }
+
+  function typeLabel(type) {
+    if (type === 'all') return 'All';
+    return type.charAt(0).toUpperCase() + type.slice(1);
+  }
+
+  function setActiveFilterUi() {
+    filterButtons.forEach((btn) => {
+      const isActive = btn.dataset.strainFilter === activeFilter;
+      btn.classList.toggle('active', isActive);
+      btn.setAttribute('aria-pressed', String(isActive));
+    });
+  }
+
   function resolveImageUrl(value) {
     const raw = String(value || '').trim();
     if (!raw) return defaultStrainImg;
@@ -115,7 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <span class="tag ${type}">${escapeHtml(type.charAt(0).toUpperCase() + type.slice(1))}</span>
             </div>
             <h3>${escapeHtml(strain.name)}</h3>
-            <p>${escapeHtml(strain.short_description || '')}</p>
+            <p class="strain-preview">${escapeHtml(strain.short_description || '')}</p>
             <div class="specs">
               <span>Terpenes: ${escapeHtml(terpenes)}</span>
               <span>Mood&Aroma: ${escapeHtml(strain.mood_aroma || '')}</span>
@@ -131,15 +151,20 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function updateHeaderAndControls() {
-    if (heading) heading.textContent = `${allStrains.length} strains in Phuket`;
+    const filtered = getFilteredStrains();
+    if (heading) {
+      if (activeFilter === 'all') heading.textContent = `${filtered.length} strains in Phuket`;
+      else heading.textContent = `${filtered.length} ${typeLabel(activeFilter)} strains in Phuket`;
+    }
     if (loadMoreWrap) {
-      const hasMore = visibleCount < allStrains.length;
+      const hasMore = visibleCount < filtered.length;
       loadMoreWrap.classList.toggle('hidden', !hasMore);
     }
   }
 
   function loadMore() {
-    const nextItems = allStrains.slice(visibleCount, visibleCount + PAGE_SIZE);
+    const filtered = getFilteredStrains();
+    const nextItems = filtered.slice(visibleCount, visibleCount + PAGE_SIZE);
     if (!nextItems.length) return;
     renderCards(nextItems, visibleCount > 0);
     visibleCount += nextItems.length;
@@ -151,6 +176,7 @@ document.addEventListener('DOMContentLoaded', () => {
     visibleCount = 0;
     if (grid) grid.innerHTML = '';
     loadMore();
+    updateHeaderAndControls();
   }
 
   async function loadAllStrains() {
@@ -181,5 +207,18 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   loadMoreBtn?.addEventListener('click', loadMore);
+  filterButtons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const selectedType = String(btn.dataset.strainFilter || 'all').toLowerCase();
+      if (!['all', 'sativa', 'indica', 'hybrid'].includes(selectedType)) return;
+      activeFilter = selectedType;
+      visibleCount = 0;
+      if (grid) grid.innerHTML = '';
+      setActiveFilterUi();
+      loadMore();
+      updateHeaderAndControls();
+    });
+  });
+  setActiveFilterUi();
   loadAllStrains();
 });
