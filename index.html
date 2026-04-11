@@ -19,7 +19,7 @@
     <div class="age-card">
       <p class="age-kicker">Stay lit, stay legal</p>
       <h2>Are you 20 or older?</h2>
-      <p class="age-copy">We love sharing good flower, but Thai law only allows us to serve adults 20+. Confirm your age to enter Let's Phuket Cannabis Guide.</p>
+      <p class="age-copy">We love sharing good flower, but Thai law only allows us to serve adults 20+. Confirm your age to enter Cannabis Guide.</p>
       <div class="age-actions">
         <button id="age-yes" class="btn primary">Yes, I’m 20+</button>
         <button id="age-no" class="btn ghost">Not yet</button>
@@ -33,20 +33,20 @@
       <nav class="nav">
         <div class="brand">
           <span class="brand-mark">🌿</span>
-          <span class="brand-name">Let’s Phuket</span>
+          <span class="brand-name" data-shop-name>Let’s Phuket</span>
         </div>
         <div class="nav-links">
           <a href="#strains">Strains</a>
-          <a href="#visit">Visit</a>
+          <a href="#visit">Contact</a>
         </div>
         <a class="btn nav-cta" href="#strains">View strains</a>
       </nav>
 
       <div class="hero-grid">
         <div class="hero-copy">
-          <p class="eyebrow">Welcome to Phuket’s playful cannabis hideout</p>
-          <h1>Let’s Phuket Cannabis Guide</h1>
-          <p class="lede">Sun-washed buds, island terpenes, and a crew that keeps it breezy. Slide through for curated strains, fresh merch, and a vibe that feels like golden hour on the beach.</p>
+          <p class="eyebrow">Welcome to Thailand’s playful cannabis hideout</p>
+          <h1 data-shop-heading>Cannabis Guide</h1>
+          <p class="lede">Discover curated strains, terpene highlights, and clear effect notes to help you compare options across Thailand with confidence.</p>
           <div class="hero-actions">
             <a class="btn primary" href="#strains">Browse strains</a>
             <a class="btn ghost" href="#visit">Find us</a>
@@ -65,7 +65,7 @@
             <p id="featured-card-description" class="card-body">Earl grey aromatics, lemon zest, and a smooth calm that stays clear and chatty.</p>
             <div class="card-stats">
               <div><span class="label">Terpenes</span><strong id="featured-card-terpenes">Linalool · Caryophyllene</strong></div>
-              <div><span class="label">Mood&Aroma</span><strong id="featured-card-mood">Calm • Focused</strong></div>
+              <div><span class="label">Mood &amp; Aroma</span><strong id="featured-card-mood">Calm • Focused</strong></div>
             </div>
           </div>
           <div class="floating-leaf leaf-a" aria-hidden="true"></div>
@@ -82,8 +82,8 @@
         <div class="section-header strains-header">
           <div class="strains-header-copy">
             <p class="eyebrow">Strain Library</p>
-            <h2 id="strains-heading">Featured strains in Phuket</h2>
-            <p class="section-lede">A curated overview of popular cannabis strains commonly found in Phuket. For informational purposes only.</p>
+            <h2 id="strains-heading">Featured strains in Thailand</h2>
+            <p class="section-lede">A curated overview of popular cannabis strains commonly found across Thailand. For informational purposes only.</p>
             <p class="strain-note">Effects described are anecdotal and for general reference only.</p>
           </div>
           <div id="strains-see-more-wrap" class="strains-see-more hidden">
@@ -98,15 +98,6 @@
         </div>
         <div id="strain-grid" class="strain-grid"></div>
       </section>
-
-      <!-- <section id="merch" class="section merch">
-        <div class="section-header">
-          <p class="eyebrow">Brand drop</p>
-          <h2>Island T-shirts & gear</h2>
-          <p class="section-lede">Soft-wash cotton, beach-ready prints, and breathable fits for Phuket heat.</p>
-        </div>
-        <div id="merch-grid" class="merch-grid"></div>
-      </section> -->
 
       <section id="visit" class="section visit">
         <div class="visit-contact-only">
@@ -123,7 +114,7 @@
     <footer class="footer">
       <div class="footer-brand">
         <span class="brand-mark">🌿</span>
-        <span class="brand-name">Let’s Phuket</span>
+          <span class="brand-name" data-shop-name>Let’s Phuket</span>
         <p class="footer-note">Serving adults 20+ in line with Thai cannabis regulations.</p>
       </div>
       <div class="footer-legal">
@@ -148,6 +139,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
-  <script src="client/assets/js/script.js"></script>
+  <script src="client/assets/js/script.js?v=20260412e"></script>
 </body>
 </html>

@@ -28,7 +28,7 @@ This project focuses on **quality content and structure first**, then future aut
 - 📱 Responsive UI
 - ⚡ Lightweight performance
 - 🌍 Deployed live with custom domain
-- 🗄️ Supabase-backed dynamic content for strains, merch, and visit info
+- 🗄️ Supabase-backed dynamic content for strains and visit info
 
 ---
 
@@ -81,7 +81,9 @@ Detailed steps: [`supabase/README.md`](supabase/README.md)
 - Route: `/admin/` (local: `http://127.0.0.1:4173/admin/`)
 - Login uses Supabase email/password auth.
 - Access is restricted to users listed in `public.admin_users`.
-- Current scope: strains CRUD (`create`, `edit`, `publish/unpublish`, `delete`, `sort_order`, `featured`).
+- Current scope:
+  - strains CRUD (`create`, `edit`, `publish/unpublish`, `delete`, `sort_order`, `featured`)
+  - shop profile editing (`name`, `visit`, `address`, `hours`, `whatsapp`, `map embed`, notes)
 
 ## 🌐 Live Preview
 

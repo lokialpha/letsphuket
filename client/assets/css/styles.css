@@ -389,6 +389,45 @@ a {
   margin: 0 0 18px;
 }
 
+.strain-search {
+  margin: 0 0 12px;
+  max-width: 520px;
+}
+
+.strain-search-label {
+  display: block;
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.strain-search-input {
+  width: 100%;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  border-radius: 12px;
+  padding: 11px 13px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.strain-search-input::placeholder {
+  color: #9eb8ac;
+}
+
+.strain-search-input:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.strain-search-input:focus-visible {
+  outline: none;
+  border-color: rgba(98, 243, 197, 0.65);
+  box-shadow: 0 0 0 3px rgba(98, 243, 197, 0.18);
+}
+
 .strain-filter-btn {
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.05);
@@ -452,6 +491,12 @@ a {
   margin-bottom: 12px;
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.03);
+}
+
+.strain-media picture {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .strain-media img {
@@ -579,109 +624,6 @@ a {
   transform: translateY(-1px);
   background: rgba(98, 243, 197, 0.2);
   border-color: rgba(98, 243, 197, 0.55);
-}
-
-.merch {
-  background: #0a1713;
-}
-
-.merch-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 18px;
-  align-items: stretch;
-  grid-auto-rows: 1fr;
-}
-
-.merch-media {
-  width: 100%;
-  height: 5in;
-  border-radius: var(--radius);
-  overflow: hidden;
-  border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.03);
-  margin-bottom: 10px;
-}
-
-.merch-media img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-  transition: transform 0.25s ease, filter 0.25s ease;
-}
-
-.merch-card:hover .merch-media img {
-  transform: scale(1.03);
-  filter: saturate(1.05);
-}
-
-.merch-card {
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.05), rgba(98, 243, 197, 0.08));
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 18px;
-  box-shadow: var(--shadow);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  height: 100%;
-  min-height: 620px;
-}
-
-.merch-copy {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  flex: 1;
-}
-
-.merch-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.merch-card h3 {
-  margin: 0;
-}
-
-.merch-card p {
-  margin: 0;
-  color: var(--muted);
-}
-
-.price {
-  font-weight: 800;
-  color: var(--accent);
-}
-
-.merch-card ul {
-  margin: 0;
-  padding-left: 18px;
-  color: var(--muted);
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.merch-card li {
-  margin: 0;
-}
-
-.ghost-btn {
-  margin-top: auto;
-  width: 100%;
-  text-align: center;
-}
-
-.ghost-btn-left {
-  margin-top: 20px;
-}
-
-.merch-card > *:not(.ghost-btn) {
-  margin-bottom: 0;
 }
 
 .visit {

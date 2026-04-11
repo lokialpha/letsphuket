@@ -4,13 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Lets Phuket Admin</title>
-  <link rel="stylesheet" href="admin.css?v=20260402">
+  <link rel="stylesheet" href="admin.css?v=20260411">
 </head>
 <body>
   <main class="container">
     <header class="topbar">
       <h1>Lets Phuket Admin</h1>
-      <p>Strains content manager</p>
+      <p>Sidebar dashboard for strains and shop profile content.</p>
     </header>
 
     <section id="auth-card" class="card auth-card">
@@ -30,199 +30,354 @@
       <p id="auth-error" class="error" aria-live="polite"></p>
     </section>
 
-    <section id="admin-app" class="hidden">
-      <div class="card session-row">
-        <div>
+    <section id="admin-app" class="hidden app-shell">
+      <aside class="card sidebar">
+        <div class="session-block">
           <strong id="session-email">Signed in</strong>
-          <p class="muted">Manage strains content from one place.</p>
+          <p class="muted">Choose a section to manage.</p>
         </div>
+
+        <nav class="sidebar-nav" aria-label="Admin sections">
+          <button type="button" class="nav-btn is-active" data-view-target="overview">Overview</button>
+          <button type="button" class="nav-btn" data-view-target="strains">Strains</button>
+          <button type="button" class="nav-btn" data-view-target="shop">Shop Profile</button>
+        </nav>
+
         <button id="signout-btn" class="btn ghost" type="button">Sign out</button>
-      </div>
+      </aside>
 
-      <div class="layout">
-        <section class="card strains-panel">
-          <div class="panel-head row-between">
-            <div>
-              <h2>Strains</h2>
-              <p class="muted panel-copy">Compact list for quick scan and edit.</p>
-            </div>
-            <button id="refresh-btn" class="btn ghost" type="button">Refresh list</button>
+      <section class="content-area">
+        <section id="view-overview" class="view" data-view="overview">
+          <div class="view-head">
+            <h2>Overview</h2>
+            <p class="muted">High-level summary of strain inventory and shop profile status.</p>
           </div>
-          <div class="panel-metrics">
-            <article class="metric-card">
-              <p class="metric-label">Total</p>
-              <p id="metric-total" class="metric-value">0</p>
+
+          <div class="overview-stats">
+            <article class="summary-card">
+              <p class="metric-label">Total strains</p>
+              <p id="overview-total" class="metric-value">0</p>
             </article>
-            <article class="metric-card">
-              <p class="metric-label">Published</p>
-              <p id="metric-published" class="metric-value">0</p>
+            <article class="summary-card">
+              <p class="metric-label">Published strains</p>
+              <p id="overview-published" class="metric-value">0</p>
             </article>
-            <article class="metric-card">
-              <p class="metric-label">Drafts</p>
-              <p id="metric-draft" class="metric-value">0</p>
+            <article class="summary-card">
+              <p class="metric-label">Draft strains</p>
+              <p id="overview-draft" class="metric-value">0</p>
+            </article>
+            <article class="summary-card">
+              <p class="metric-label">Featured strains</p>
+              <p id="overview-featured" class="metric-value">0</p>
             </article>
           </div>
-          <div class="list-tools">
-            <input id="search-input" type="text" placeholder="Search name or slug">
-            <select id="filter-select">
-              <option value="all">All statuses</option>
-              <option value="published">Published</option>
-              <option value="draft">Draft</option>
-              <option value="featured">Featured</option>
-            </select>
-          </div>
-          <p id="list-summary" class="list-summary muted">Showing 0 of 0 strains.</p>
-          <div id="list-shell" class="list-shell">
-            <div id="list-loading" class="list-state hidden" role="status" aria-live="polite">
-              <span class="state-spinner" aria-hidden="true"></span>
-              <p class="list-state-title">Loading strains...</p>
-              <p class="list-state-copy">Fetching latest records from Supabase.</p>
-            </div>
-            <div id="strains-list" class="list"></div>
-            <div id="list-empty" class="list-state hidden" role="status" aria-live="polite">
-              <p id="list-empty-title" class="list-state-title">No strains found.</p>
-              <p id="list-empty-copy" class="list-state-copy">Add your first strain to start building the library.</p>
-              <button id="list-reset-btn" class="btn ghost hidden" type="button">Clear filters</button>
-            </div>
+
+          <div class="overview-grid">
+            <section class="card summary-panel">
+              <h3>Shop Snapshot</h3>
+              <div class="summary-list">
+                <p><span>Name</span><strong id="overview-shop-name">-</strong></p>
+                <p><span>Hours</span><strong id="overview-shop-hours">-</strong></p>
+                <p><span>Address</span><strong id="overview-shop-address">-</strong></p>
+                <p><span>WhatsApp</span><strong id="overview-shop-whatsapp">-</strong></p>
+              </div>
+            </section>
+
+            <section class="card summary-panel">
+              <h3>Sync Status</h3>
+              <div class="summary-list">
+                <p><span>Strains sync</span><strong id="overview-strains-sync">Not synced yet</strong></p>
+                <p><span>Shop profile sync</span><strong id="overview-shop-sync">Not synced yet</strong></p>
+              </div>
+            </section>
           </div>
         </section>
 
-        <section class="card editor-panel">
-          <div class="panel-head row-between">
-            <div>
-              <h2 id="form-title">Create Strain</h2>
-              <p id="form-mode-badge" class="mode-badge">Create mode</p>
+        <section id="view-strains" class="view hidden" data-view="strains">
+          <section class="card strains-page">
+            <div class="panel-head row-between">
+              <div>
+                <h2>Strains</h2>
+                <p class="muted panel-copy">Browse, search, and filter strains. Open editor only when needed.</p>
+              </div>
+              <div class="panel-head-actions">
+                <button id="refresh-btn" class="btn ghost" type="button">Refresh list</button>
+                <button id="new-btn" class="btn primary" type="button">Create strain</button>
+              </div>
             </div>
-            <button id="new-btn" class="btn ghost" type="button">New strain</button>
-          </div>
 
-          <form id="strain-form" class="form-grid">
-            <input id="strain-id" type="hidden">
+            <div class="panel-metrics">
+              <article class="metric-card">
+                <p class="metric-label">Total</p>
+                <p id="metric-total" class="metric-value">0</p>
+              </article>
+              <article class="metric-card">
+                <p class="metric-label">Published</p>
+                <p id="metric-published" class="metric-value">0</p>
+              </article>
+              <article class="metric-card">
+                <p class="metric-label">Drafts</p>
+                <p id="metric-draft" class="metric-value">0</p>
+              </article>
+              <article class="metric-card">
+                <p class="metric-label">Featured</p>
+                <p id="metric-featured" class="metric-value">0</p>
+              </article>
+            </div>
 
-            <section class="form-section full-width">
-              <h3>Image preview</h3>
-              <div class="image-preview-wrap">
-                <div id="image-preview-frame" class="image-preview">
-                  <div id="image-preview-tools" class="image-preview-tools hidden">
-                    <button id="preview-open-btn" class="preview-action" type="button">Open</button>
-                    <button id="preview-copy-btn" class="preview-action" type="button">Copy URL</button>
-                    <button id="preview-download-btn" class="preview-action" type="button">Download</button>
-                  </div>
-                  <img id="image-preview" alt="Preview" class="hidden">
-                  <p id="image-preview-note" class="muted">Enter an image URL to preview.</p>
-                  <span id="image-preview-meta" class="image-preview-meta hidden"></span>
-                  <span id="image-preview-hint" class="image-preview-hint hidden">Click to view fullscreen</span>
+            <div class="list-tools">
+              <input id="search-input" type="text" placeholder="Search name or slug">
+              <select id="filter-select">
+                <option value="all">All statuses</option>
+                <option value="published">Published</option>
+                <option value="draft">Draft</option>
+                <option value="featured">Featured</option>
+              </select>
+            </div>
+
+            <p id="list-summary" class="list-summary muted">Showing 0 of 0 strains.</p>
+
+            <div id="list-shell" class="list-shell">
+              <div id="list-loading" class="list-state hidden" role="status" aria-live="polite">
+                <span class="state-spinner" aria-hidden="true"></span>
+                <p class="list-state-title">Loading strains...</p>
+                <p class="list-state-copy">Fetching latest records from Supabase.</p>
+              </div>
+
+              <div id="strains-list" class="list"></div>
+
+              <div id="list-empty" class="list-state hidden" role="status" aria-live="polite">
+                <p id="list-empty-title" class="list-state-title">No strains found.</p>
+                <p id="list-empty-copy" class="list-state-copy">Add your first strain to start building the library.</p>
+                <button id="list-reset-btn" class="btn ghost hidden" type="button">Clear filters</button>
+              </div>
+            </div>
+          </section>
+        </section>
+
+        <section id="view-shop" class="view hidden" data-view="shop">
+          <section class="card shop-panel">
+            <div class="panel-head row-between">
+              <div>
+                <h2>Shop Profile</h2>
+                <p class="muted panel-copy">Full-width settings for homepage visit and contact content.</p>
+              </div>
+              <button id="shop-refresh-btn" class="btn ghost" type="button">Refresh profile</button>
+            </div>
+
+            <form id="shop-form" class="form-grid">
+              <section class="form-section full-width">
+                <h3>Basic</h3>
+                <div class="section-grid">
+                  <label>
+                    Shop Name
+                    <input id="shop-name" type="text" required>
+                  </label>
                 </div>
+              </section>
+
+              <section class="form-section full-width">
+                <h3>Visit Info</h3>
+                <div class="section-grid">
+                  <label>
+                    Hours text
+                    <input id="shop-hours-text" type="text" placeholder="Daily 10:00 AM - 12:00 PM">
+                  </label>
+
+                  <label class="full-width">
+                    Visit lede
+                    <textarea id="shop-visit-lede" rows="3"></textarea>
+                  </label>
+
+                  <label class="full-width">
+                    Address
+                    <textarea id="shop-address" rows="2"></textarea>
+                  </label>
+                </div>
+              </section>
+
+              <section class="form-section full-width">
+                <h3>Links</h3>
+                <div class="section-grid">
+                  <label>
+                    WhatsApp URL
+                    <input id="shop-whatsapp-url" type="text" placeholder="https://wa.me/...">
+                  </label>
+
+                  <label>
+                    Map embed URL
+                    <input id="shop-map-embed-url" type="text" placeholder="https://www.google.com/maps/embed?...">
+                  </label>
+                </div>
+              </section>
+
+              <section class="form-section full-width">
+                <h3>Notes</h3>
+                <div class="section-grid">
+                  <label class="full-width">
+                    Map note
+                    <textarea id="shop-map-note" rows="2"></textarea>
+                  </label>
+
+                  <label class="full-width">
+                    Visit note
+                    <textarea id="shop-visit-note" rows="2"></textarea>
+                  </label>
+                </div>
+              </section>
+
+              <div class="actions full-width">
+                <button id="shop-save-btn" type="submit" class="btn primary">Save shop profile</button>
               </div>
-            </section>
+            </form>
 
-            <section class="form-section full-width">
-              <h3>Basic info</h3>
-              <div class="section-grid">
-                <label>
-                  Name
-                  <input id="name" type="text" required>
-                </label>
-
-                <label>
-                  Slug
-                  <input id="slug" type="text" required placeholder="tea-time">
-                </label>
-
-                <label>
-                  Strain Type
-                  <select id="strain_type" required>
-                    <option value="hybrid">Hybrid</option>
-                    <option value="indica">Indica</option>
-                    <option value="sativa">Sativa</option>
-                  </select>
-                </label>
-
-                <label>
-                  Sort Order
-                  <input id="sort_order" type="number" min="0" step="1" value="100" required>
-                </label>
-              </div>
-            </section>
-
-            <section class="form-section full-width">
-              <h3>Content</h3>
-              <div class="section-grid">
-                <label class="full-width">
-                  Description
-                  <textarea id="short_description" rows="3" required></textarea>
-                </label>
-
-                <label>
-                  Mood&Aroma
-                  <input id="mood_aroma" type="text" placeholder="Calm - Focused" required>
-                </label>
-
-                <label>
-                  Terpenes (comma separated)
-                  <input id="terpenes" type="text" placeholder="Linalool, Caryophyllene" required>
-                </label>
-              </div>
-            </section>
-
-            <section class="form-section full-width">
-              <h3>Media</h3>
-              <div class="section-grid">
-                <label>
-                  Image URL
-                  <input id="image_url" type="text" placeholder="https://... or image/default.jpg">
-                </label>
-
-                <label>
-                  Image Alt
-                  <input id="image_alt" type="text" placeholder="Tea Time strain flower">
-                </label>
-
-                <label class="full-width">
-                  Add Image File
-                  <input id="image_file" type="file" accept="image/*">
-                  <small class="muted upload-note">Select an image to auto-fill Image URL and preview.</small>
-                </label>
-              </div>
-            </section>
-
-            <section class="form-section full-width">
-              <h3>Publishing</h3>
-              <div class="section-grid publish-grid">
-                <label class="checkbox-row">
-                  <input id="is_featured" type="checkbox">
-                  Featured in hero
-                </label>
-
-                <label class="checkbox-row">
-                  <input id="is_published" type="checkbox" checked>
-                  Published
-                </label>
-              </div>
-            </section>
-
-            <div class="actions full-width">
-              <button id="save-btn" type="submit" class="btn primary">Create strain</button>
-              <button id="delete-btn" type="button" class="btn danger hidden">Delete strain</button>
-            </div>
-          </form>
-
-          <p id="form-status" class="muted" aria-live="polite"></p>
-          <p id="form-error" class="error" aria-live="polite"></p>
+            <p id="shop-form-status" class="status-block muted" aria-live="polite"></p>
+            <p id="shop-form-error" class="error" aria-live="polite"></p>
+          </section>
         </section>
-      </div>
+      </section>
     </section>
   </main>
 
+  <div id="strain-drawer" class="drawer hidden" aria-hidden="true">
+    <button id="strain-drawer-backdrop" class="drawer-backdrop" type="button" aria-label="Close editor"></button>
+
+    <section class="drawer-panel editor-panel" role="dialog" aria-modal="true" aria-labelledby="form-title">
+      <div class="panel-head row-between sticky-head">
+        <div>
+          <h2 id="form-title">Create Strain</h2>
+          <p id="form-mode-badge" class="mode-badge">Create mode</p>
+        </div>
+        <button id="drawer-close-btn" class="btn ghost" type="button">Close</button>
+      </div>
+
+      <form id="strain-form" class="form-grid">
+        <input id="strain-id" type="hidden">
+
+        <section class="form-section full-width">
+          <h3>Image preview</h3>
+          <div class="image-preview-wrap">
+            <div id="image-preview-frame" class="image-preview">
+              <div id="image-preview-tools" class="image-preview-tools hidden">
+                <button id="preview-open-btn" class="preview-action" type="button">Open</button>
+                <button id="preview-copy-btn" class="preview-action" type="button">Copy URL</button>
+                <button id="preview-download-btn" class="preview-action" type="button">Download</button>
+              </div>
+              <img id="image-preview" src="../image/default.jpg" alt="Preview" class="hidden">
+              <p id="image-preview-note" class="muted">Enter an image URL to preview.</p>
+              <span id="image-preview-meta" class="image-preview-meta hidden"></span>
+              <span id="image-preview-hint" class="image-preview-hint hidden">Click to view fullscreen</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="form-section full-width">
+          <h3>Basic info</h3>
+          <div class="section-grid">
+            <label>
+              Name
+              <input id="name" type="text" required>
+            </label>
+
+            <label>
+              Slug
+              <input id="slug" type="text" required placeholder="tea-time">
+            </label>
+
+            <label>
+              Strain Type
+              <select id="strain_type" required>
+                <option value="hybrid">Hybrid</option>
+                <option value="indica">Indica</option>
+                <option value="sativa">Sativa</option>
+              </select>
+            </label>
+
+            <label>
+              Sort Order
+              <input id="sort_order" type="number" min="0" step="1" value="100" required>
+            </label>
+          </div>
+        </section>
+
+        <section class="form-section full-width">
+          <h3>Content</h3>
+          <div class="section-grid">
+            <label class="full-width">
+              Description
+              <textarea id="short_description" rows="3" required></textarea>
+            </label>
+
+            <label>
+              Mood &amp; Aroma
+              <input id="mood_aroma" type="text" placeholder="Calm - Focused" required>
+            </label>
+
+            <label>
+              Terpenes (comma separated)
+              <input id="terpenes" type="text" placeholder="Linalool, Caryophyllene" required>
+            </label>
+          </div>
+        </section>
+
+        <section class="form-section full-width">
+          <h3>Media</h3>
+          <div class="section-grid">
+            <label>
+              Image URL
+              <input id="image_url" type="text" placeholder="https://... or image/default.jpg">
+            </label>
+
+            <label>
+              Image Alt
+              <input id="image_alt" type="text" placeholder="Tea Time strain flower">
+            </label>
+
+            <label class="full-width">
+              Add Image File
+              <input id="image_file" type="file" accept="image/*">
+              <small class="muted upload-note">Select an image to auto-fill Image URL and preview.</small>
+            </label>
+          </div>
+        </section>
+
+        <section class="form-section full-width">
+          <h3>Publishing</h3>
+          <div class="section-grid publish-grid">
+            <label class="checkbox-row">
+              <input id="is_featured" type="checkbox">
+              Featured in hero
+            </label>
+
+            <label class="checkbox-row">
+              <input id="is_published" type="checkbox" checked>
+              Published
+            </label>
+          </div>
+        </section>
+
+        <div class="actions full-width">
+          <button id="save-btn" type="submit" class="btn primary">Create strain</button>
+          <button id="delete-btn" type="button" class="btn danger hidden">Delete strain</button>
+        </div>
+      </form>
+
+      <p id="form-status" class="status-block muted" aria-live="polite"></p>
+      <p id="form-error" class="error" aria-live="polite"></p>
+    </section>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../supabase-config.js"></script>
-  <script src="admin.js?v=20260402"></script>
+  <script src="admin.js?v=20260412a"></script>
+
   <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="true"></div>
+
   <div id="image-modal" class="image-modal hidden" role="dialog" aria-modal="true" aria-label="Full size image preview">
     <div id="image-modal-backdrop" class="image-modal-backdrop"></div>
     <div class="image-modal-content">
       <button id="image-modal-close" class="btn ghost image-modal-close" type="button" aria-label="Close full size preview">Close</button>
-      <img id="image-modal-img" alt="Full size preview">
+      <img id="image-modal-img" src="../image/default.jpg" alt="Full size preview">
     </div>
   </div>
 </body>

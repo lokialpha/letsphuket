@@ -13,7 +13,7 @@ This creates:
 - RLS policies and seed data
 
 ## 2) Configure frontend
-Edit [`/supabase-config.js`](/Users/macbookair/Desktop/letsphuket-main/supabase-config.js):
+Edit [`../supabase-config.js`](../supabase-config.js):
 
 ```js
 window.__SUPABASE_CONFIG__ = {
@@ -23,6 +23,7 @@ window.__SUPABASE_CONFIG__ = {
 ```
 
 If `url`/`anonKey` are blank, the website automatically falls back to local hardcoded content.
+This project is static HTML/JS, so values in `.env` are not auto-loaded by the browser runtime.
 
 ## 3) Grant admin edit access
 After creating a user in Supabase Auth, run this SQL with that user id:

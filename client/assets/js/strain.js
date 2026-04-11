@@ -6,6 +6,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const page = document.getElementById('page');
 
   const defaultStrainImg = '/image/default.jpg';
+  const STRAINS_CACHE_KEY = 'lp_strains_cache_v1';
+  const STRAINS_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+  const STRAIN_DETAIL_PREFETCH_KEY_PREFIX = 'lp_strain_prefetch_v1:';
+  const STRAIN_DETAIL_PREFETCH_MAX_AGE_MS = 30 * 60 * 1000;
+  const DEFAULT_SHOP_NAME = "Let's Phuket";
+  const SHOP_NAME_CACHE_KEY = 'lp_shop_name_v1';
+  const SHOP_NAME_PATTERNS = [/Let['’]s Phuket/g, /Lets Phuket/g];
+  let activeShopName = DEFAULT_SHOP_NAME;
+  let brandTextNodes = null;
 
   const FALLBACK_STRAINS = [
     {
@@ -110,6 +119,123 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   ];
 
+  function normalizeShopName(value) {
+    const name = String(value || '').trim();
+    return name || DEFAULT_SHOP_NAME;
+  }
+
+  function readCachedShopName() {
+    try {
+      const cached = String(localStorage.getItem(SHOP_NAME_CACHE_KEY) || '').trim();
+      return cached || null;
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function writeCachedShopName(value) {
+    const safeName = normalizeShopName(value);
+
+    try {
+      localStorage.setItem(SHOP_NAME_CACHE_KEY, safeName);
+    } catch (_error) {
+      // Ignore storage write failures (private mode/quota limits).
+    }
+  }
+
+  function replaceBrandText(template, shopName) {
+    return SHOP_NAME_PATTERNS.reduce((output, pattern) => output.replace(pattern, shopName), String(template || ''));
+  }
+
+  function getBrandTextNodes() {
+    if (Array.isArray(brandTextNodes)) return brandTextNodes;
+
+    brandTextNodes = [];
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    let node = walker.nextNode();
+    while (node) {
+      const text = String(node.nodeValue || '');
+      if (SHOP_NAME_PATTERNS.some((pattern) => {
+        pattern.lastIndex = 0;
+        return pattern.test(text);
+      })) {
+        node.__brandTemplate = text;
+        brandTextNodes.push(node);
+      }
+      node = walker.nextNode();
+    }
+    return brandTextNodes;
+  }
+
+  function applyShopNameToPageText(shopName) {
+    getBrandTextNodes().forEach((node) => {
+      const template = String(node.__brandTemplate || node.nodeValue || '');
+      node.nodeValue = replaceBrandText(template, shopName);
+    });
+  }
+
+  function applyShopNameToMeta(shopName) {
+    const descriptionMeta = document.querySelector('meta[name="description"]');
+    if (descriptionMeta) {
+      const template = String(descriptionMeta.__brandTemplate || descriptionMeta.getAttribute('content') || '');
+      descriptionMeta.__brandTemplate = template;
+      descriptionMeta.setAttribute('content', replaceBrandText(template, shopName));
+    }
+  }
+
+  function applyShopBranding(value) {
+    activeShopName = normalizeShopName(value);
+    applyShopNameToPageText(activeShopName);
+    applyShopNameToMeta(activeShopName);
+
+    document.querySelectorAll('[data-shop-name]').forEach((element) => {
+      element.textContent = activeShopName;
+    });
+
+    const nameText = String(document.getElementById('strain-name')?.textContent || '').trim();
+    const hasRenderableName = Boolean(nameText) && nameText !== 'Loading...';
+    document.title = hasRenderableName
+      ? `${nameText} | ${activeShopName}`
+      : `Strain Detail | ${activeShopName}`;
+
+    const appleTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+    if (appleTitle) appleTitle.setAttribute('content', activeShopName);
+  }
+
+  function applyLiveShopName(value) {
+    const safeName = normalizeShopName(value);
+    applyShopBranding(safeName);
+    writeCachedShopName(safeName);
+  }
+
+  applyShopBranding(readCachedShopName() || DEFAULT_SHOP_NAME);
+
+  window.addEventListener('storage', (event) => {
+    if (event.key !== SHOP_NAME_CACHE_KEY) return;
+    applyShopBranding(event.newValue);
+  });
+
+  async function fetchShopNameViaRest() {
+    const cfg = window.__SUPABASE_CONFIG__;
+    const baseUrl = String(cfg?.url || '').trim();
+    const anonKey = String(cfg?.anonKey || '').trim();
+    if (!baseUrl.startsWith('https://') || anonKey.length < 20) return null;
+
+    const endpoint = `${baseUrl}/rest/v1/shop_profile?id=eq.1&select=name`;
+    const response = await fetch(endpoint, {
+      headers: {
+        apikey: anonKey,
+        Authorization: `Bearer ${anonKey}`
+      }
+    });
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    if (!Array.isArray(data) || data.length === 0) return null;
+    const name = String(data[0]?.name || '').trim();
+    return name || null;
+  }
+
   function setUnlocked() {
     gate.classList.add('hidden');
     document.body.classList.remove('age-locked');
@@ -175,6 +301,57 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  function readPrefetchedStrainDetail(slug) {
+    if (!slug) return null;
+    try {
+      const raw = sessionStorage.getItem(`${STRAIN_DETAIL_PREFETCH_KEY_PREFIX}${slug}`);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return null;
+
+      const age = Date.now() - Number(parsed.cachedAt || 0);
+      if (!Number.isFinite(age) || age > STRAIN_DETAIL_PREFETCH_MAX_AGE_MS) {
+        sessionStorage.removeItem(`${STRAIN_DETAIL_PREFETCH_KEY_PREFIX}${slug}`);
+        return null;
+      }
+
+      const strain = parsed.strain;
+      if (!strain || String(strain.slug || '').toLowerCase() !== slug) return null;
+      return strain;
+    } catch (error) {
+      console.warn('Failed to read prefetched strain detail.', error);
+      return null;
+    }
+  }
+
+  function readCachedStrainBySlug(slug) {
+    if (!slug) return null;
+    try {
+      const raw = localStorage.getItem(STRAINS_CACHE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+
+      if (Array.isArray(parsed)) {
+        localStorage.removeItem(STRAINS_CACHE_KEY);
+        return null;
+      }
+
+      const cachedAt = Number(parsed?.updatedAt || 0);
+      const ageMs = Date.now() - cachedAt;
+      const isFresh = Number.isFinite(cachedAt) && cachedAt > 0 && Number.isFinite(ageMs) && ageMs <= STRAINS_CACHE_MAX_AGE_MS;
+      if (!isFresh) {
+        localStorage.removeItem(STRAINS_CACHE_KEY);
+        return null;
+      }
+
+      const strains = Array.isArray(parsed?.strains) ? parsed.strains : [];
+      return strains.find((item) => String(item?.slug || '').toLowerCase() === slug) || null;
+    } catch (error) {
+      console.warn('Failed to read cached strains list.', error);
+      return null;
+    }
+  }
+
   function renderNotFound(message) {
     const error = document.getElementById('detail-error');
     const name = document.getElementById('strain-name');
@@ -191,6 +368,8 @@ document.addEventListener('DOMContentLoaded', () => {
       error.textContent = message;
       error.classList.remove('hidden');
     }
+
+    document.title = `Strain not found | ${activeShopName}`;
   }
 
   function renderStrain(strain) {
@@ -230,7 +409,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const safeName = String(strain.name || 'Strain detail');
-    document.title = `${safeName} | Let's Phuket`;
+    document.title = `${safeName} | ${activeShopName}`;
   }
 
   async function loadStrainDetail() {
@@ -241,16 +420,54 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const fallbackStrain = FALLBACK_STRAINS.find((item) => item.slug === slug);
+    const prefetchedStrain = readPrefetchedStrainDetail(slug);
+    const cachedStrain = readCachedStrainBySlug(slug);
+    const immediateStrain = prefetchedStrain || cachedStrain || fallbackStrain || null;
+    if (immediateStrain) renderStrain(immediateStrain);
     const supabase = getSupabaseClient();
 
     if (!supabase) {
-      if (fallbackStrain) {
-        renderStrain(fallbackStrain);
+      fetchShopNameViaRest()
+        .then((name) => {
+          if (name) applyLiveShopName(name);
+        })
+        .catch((_error) => {
+          // Keep fallback branding when REST lookup is unavailable.
+        });
+
+      if (immediateStrain) {
+        if (immediateStrain === cachedStrain || immediateStrain === prefetchedStrain) {
+          const error = document.getElementById('detail-error');
+          if (error) {
+            error.textContent = 'Showing cached profile while live sync is unavailable.';
+            error.classList.remove('hidden');
+          }
+        }
       } else {
         renderNotFound(`No strain found for slug "${slug}".`);
       }
       return;
     }
+
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('shop_profile')
+          .select('name')
+          .eq('id', 1)
+          .maybeSingle();
+
+        if (!error && data) {
+          applyLiveShopName(data?.name);
+          return;
+        }
+      } catch (_error) {
+        // Try REST fallback below.
+      }
+
+      const restName = await fetchShopNameViaRest().catch(() => null);
+      if (restName) applyLiveShopName(restName);
+    })();
 
     try {
       const { data, error } = await supabase
@@ -267,6 +484,15 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
+      if (prefetchedStrain || cachedStrain) {
+        const error = document.getElementById('detail-error');
+        if (error) {
+          error.textContent = 'Live profile unavailable. Showing cached details.';
+          error.classList.remove('hidden');
+        }
+        return;
+      }
+
       if (fallbackStrain) {
         renderStrain(fallbackStrain);
         return;
@@ -275,7 +501,13 @@ document.addEventListener('DOMContentLoaded', () => {
       renderNotFound(`No published strain found for slug "${slug}".`);
     } catch (error) {
       console.error('Failed to load strain detail from Supabase.', error);
-      if (fallbackStrain) {
+      if (prefetchedStrain || cachedStrain) {
+        const detailError = document.getElementById('detail-error');
+        if (detailError) {
+          detailError.textContent = 'Showing cached profile while live sync is unavailable.';
+          detailError.classList.remove('hidden');
+        }
+      } else if (fallbackStrain) {
         renderStrain(fallbackStrain);
       } else {
         renderNotFound('Could not load strain detail right now.');

@@ -8,8 +8,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const defaultStrainImg = '/image/default.jpg';
   const HOMEPAGE_STRAIN_LIMIT = 10;
+  const DEFAULT_SHOP_NAME = "Let's Phuket";
+  const SHOP_NAME_CACHE_KEY = 'lp_shop_name_v1';
+  const SHOP_NAME_PATTERNS = [/Let['’]s Phuket/g, /Lets Phuket/g];
   let homepageAllStrains = [];
   let activeHomepageFilter = 'all';
+  let activeShopName = DEFAULT_SHOP_NAME;
+  let brandTextNodes = null;
 
   const FALLBACK_DATA = {
     strains: [
@@ -134,41 +139,8 @@ document.addEventListener('DOMContentLoaded', () => {
         is_featured: false
       }
     ],
-    merch: [
-      {
-        slug: 'island-tee-front',
-        name: 'Island Tee - Front',
-        category: 'T-Shirt',
-        description: 'Front chest print with Our Logo and clean typography.',
-        bullet_points: [
-          '100% cotton, soft handfeel',
-          'Sizes XS-XL, relaxed fit',
-          'Front logo: Our Logo'
-        ],
-        image_url: 'image/1.svg',
-        image_alt: 'Let\'s Phuket T-shirt front view',
-        cta_label: 'In-store only',
-        cta_url: null,
-        sort_order: 1
-      },
-      {
-        slug: 'island-tee-back',
-        name: 'Island Tee - Back',
-        category: 'T-Shirt',
-        description: 'Full-back QR for our location',
-        bullet_points: [
-          'Same fabric/fit as front',
-          'Back includes QR to our shop address',
-          'Care: cold wash, inside-out'
-        ],
-        image_url: 'image/2.svg',
-        image_alt: 'Let\'s Phuket T-shirt back view',
-        cta_label: 'In-store only',
-        cta_url: null,
-        sort_order: 2
-      }
-    ],
     shop: {
+      name: DEFAULT_SHOP_NAME,
       visit_lede: 'Drop by our beach-level lounge between Patong and Kamala. Ask for the terp flight and we\'ll line up glass so you can taste the island spectrum.',
       address: '187, 36 Phangnga Rd, Talat Yai, Amphoe Muang, Phuket 83000',
       hours_text: 'Daily 10:00 AM - 12:00 PM',
@@ -180,6 +152,126 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const LEAF_ICON = '<svg viewBox="0 0 64 64"><path d="M32 6c4 9 6 13 10 16 6 4 11 2 11 2s-4 6-10 8c-3 1-8 1-11-1 1 7 3 14 2 23l-3-8-3 8c-1-9 1-16 2-23-3 2-8 2-11 1-6-2-10-8-10-8s5 2 11-2c4-3 6-7 10-16z" /></svg>';
+
+  function normalizeShopName(value) {
+    const name = String(value || '').trim();
+    return name || DEFAULT_SHOP_NAME;
+  }
+
+  function readCachedShopName() {
+    try {
+      const cached = String(localStorage.getItem(SHOP_NAME_CACHE_KEY) || '').trim();
+      return cached || null;
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function writeCachedShopName(value) {
+    const safeName = normalizeShopName(value);
+
+    try {
+      localStorage.setItem(SHOP_NAME_CACHE_KEY, safeName);
+    } catch (_error) {
+      // Ignore storage write failures (private mode/quota limits).
+    }
+  }
+
+  function replaceBrandText(template, shopName) {
+    return SHOP_NAME_PATTERNS.reduce((output, pattern) => output.replace(pattern, shopName), String(template || ''));
+  }
+
+  function getBrandTextNodes() {
+    if (Array.isArray(brandTextNodes)) return brandTextNodes;
+
+    brandTextNodes = [];
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    let node = walker.nextNode();
+    while (node) {
+      const text = String(node.nodeValue || '');
+      if (SHOP_NAME_PATTERNS.some((pattern) => {
+        pattern.lastIndex = 0;
+        return pattern.test(text);
+      })) {
+        node.__brandTemplate = text;
+        brandTextNodes.push(node);
+      }
+      node = walker.nextNode();
+    }
+    return brandTextNodes;
+  }
+
+  function applyShopNameToPageText(shopName) {
+    getBrandTextNodes().forEach((node) => {
+      const template = String(node.__brandTemplate || node.nodeValue || '');
+      node.nodeValue = replaceBrandText(template, shopName);
+    });
+  }
+
+  function applyShopNameToMeta(shopName) {
+    const descriptionMeta = document.querySelector('meta[name="description"]');
+    if (descriptionMeta) {
+      const template = String(descriptionMeta.__brandTemplate || descriptionMeta.getAttribute('content') || '');
+      descriptionMeta.__brandTemplate = template;
+      descriptionMeta.setAttribute('content', replaceBrandText(template, shopName));
+    }
+  }
+
+  function applyShopBranding(value) {
+    activeShopName = normalizeShopName(value);
+    applyShopNameToPageText(activeShopName);
+    applyShopNameToMeta(activeShopName);
+
+    document.querySelectorAll('[data-shop-name]').forEach((element) => {
+      element.textContent = activeShopName;
+    });
+
+    const heading = document.querySelector('[data-shop-heading]');
+    if (heading) heading.textContent = 'Cannabis Guide';
+
+    const ageCopy = document.querySelector('#age-gate .age-copy');
+    if (ageCopy) {
+      ageCopy.textContent = 'We love sharing good flower, but Thai law only allows us to serve adults 20+. Confirm your age to enter Cannabis Guide.';
+    }
+
+    document.title = `${activeShopName} | Cannabis Guide`;
+    const appleTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+    if (appleTitle) appleTitle.setAttribute('content', activeShopName);
+  }
+
+  function applyLiveShopName(value) {
+    const safeName = normalizeShopName(value);
+    applyShopBranding(safeName);
+    writeCachedShopName(safeName);
+  }
+
+  applyShopBranding(readCachedShopName() || DEFAULT_SHOP_NAME);
+
+  window.addEventListener('storage', (event) => {
+    if (event.key !== SHOP_NAME_CACHE_KEY) return;
+    applyShopBranding(event.newValue);
+  });
+
+  async function fetchShopNameViaRest() {
+    const cfg = window.__SUPABASE_CONFIG__;
+    const baseUrl = String(cfg?.url || '').trim();
+    const anonKey = String(cfg?.anonKey || '').trim();
+    if (!baseUrl.startsWith('https://') || anonKey.length < 20) return null;
+
+    const endpoint = `${baseUrl}/rest/v1/shop_profile?id=eq.1&select=name`;
+    const response = await fetch(endpoint, {
+      headers: {
+        apikey: anonKey,
+        Authorization: `Bearer ${anonKey}`
+      }
+    });
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    if (!Array.isArray(data) || data.length === 0) return null;
+    const name = String(data[0]?.name || '').trim();
+    return name || null;
+  }
 
   const setUnlocked = () => {
     gate.classList.add('hidden');
@@ -278,7 +370,7 @@ document.addEventListener('DOMContentLoaded', () => {
       img.src = defaultStrainImg;
     };
 
-    document.querySelectorAll('.strain-media img, .merch-media img').forEach((img) => {
+    document.querySelectorAll('.strain-media img').forEach((img) => {
       img.addEventListener('error', () => setFallback(img), { once: true });
 
       const src = img.getAttribute('src');
@@ -316,7 +408,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <p class="strain-preview">${escapeHtml(strain.short_description || '')}</p>
             <div class="specs">
               <span>Terpenes: ${escapeHtml(terpenes)}</span>
-              <span>Mood&Aroma: ${escapeHtml(strain.mood_aroma || '')}</span>
+              <span>Mood &amp; Aroma: ${escapeHtml(strain.mood_aroma || '')}</span>
             </div>
             <span class="strain-link">View details</span>
           </article>
@@ -325,7 +417,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }).join('');
 
     const heading = document.getElementById('strains-heading');
-    if (heading) heading.textContent = `${strains.length} strains in Phuket`;
+    if (heading) heading.textContent = `${strains.length} strains in Thailand`;
   }
 
   function renderHomepageByFilter() {
@@ -336,11 +428,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const heading = document.getElementById('strains-heading');
     if (heading) {
       if (activeHomepageFilter === 'all' && filtered.length > HOMEPAGE_STRAIN_LIMIT) {
-        heading.textContent = `Top ${HOMEPAGE_STRAIN_LIMIT} of ${filtered.length} strains in Phuket`;
+        heading.textContent = `Top ${HOMEPAGE_STRAIN_LIMIT} of ${filtered.length} strains in Thailand`;
       } else if (activeHomepageFilter === 'all') {
-        heading.textContent = `${filtered.length} featured strains in Phuket`;
+        heading.textContent = `${filtered.length} featured strains in Thailand`;
       } else {
-        heading.textContent = `${filtered.length} ${titleType(activeHomepageFilter)} strains in Phuket`;
+        heading.textContent = `${filtered.length} ${titleType(activeHomepageFilter)} strains in Thailand`;
       }
     }
 
@@ -392,39 +484,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (cardMood) cardMood.textContent = String(featured.mood_aroma || '').replaceAll('-', '•');
   }
 
-  function renderMerchItems(items) {
-    const merchGrid = document.getElementById('merch-grid');
-    if (!merchGrid) return;
-
-    merchGrid.innerHTML = items.map((item, index) => {
-      const bulletPoints = Array.isArray(item.bullet_points) ? item.bullet_points : [];
-      const bulletHtml = bulletPoints.map((point) => `<li>${escapeHtml(point)}</li>`).join('');
-
-      const ctaLabel = escapeHtml(item.cta_label || 'In-store only');
-      const ctaUrl = String(item.cta_url || '').trim();
-      const actionHtml = ctaUrl
-        ? `<a class="btn primary ghost-btn${index === 0 ? ' ghost-btn-left' : ''}" href="${escapeHtml(ctaUrl)}" target="_blank" rel="noopener noreferrer">${ctaLabel}</a>`
-        : `<button class="btn primary ghost-btn${index === 0 ? ' ghost-btn-left' : ''}">${ctaLabel}</button>`;
-
-      return `
-        <article class="merch-card">
-          <div class="merch-top">
-            <span class="tag merch-tag">${escapeHtml(item.category || 'Item')}</span>
-          </div>
-          <div class="merch-media">
-            <img src="${escapeHtml(resolveImageUrl(item.image_url || defaultStrainImg))}" alt="${escapeHtml(item.image_alt || item.name)}" loading="lazy">
-          </div>
-          <div class="merch-copy">
-            <h3>${escapeHtml(item.name)}</h3>
-            <p>${escapeHtml(item.description || '')}</p>
-            <ul>${bulletHtml}</ul>
-          </div>
-          ${actionHtml}
-        </article>
-      `;
-    }).join('');
-  }
-
   function safeMapUrl(value) {
     const url = String(value || '').trim();
     if (!url) return null;
@@ -458,7 +517,13 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function applyShopProfile(shop) {
-    if (!shop) return;
+    if (!shop) {
+      applyShopBranding(DEFAULT_SHOP_NAME);
+      return;
+    }
+
+    applyShopBranding(shop.name);
+    writeCachedShopName(shop.name);
 
     const visitLede = document.getElementById('visit-lede');
     const visitAddress = document.getElementById('visit-address');
@@ -506,8 +571,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const supabase = getSupabaseClient();
 
     if (!supabase) {
+      fetchShopNameViaRest()
+        .then((name) => {
+          if (name) applyLiveShopName(name);
+        })
+        .catch((_error) => {
+          // Keep fallback branding when REST lookup is unavailable.
+        });
+
       applyHomepageStrains(FALLBACK_DATA.strains);
-      renderMerchItems(FALLBACK_DATA.merch);
       applyShopProfile(FALLBACK_DATA.shop);
       applyFeaturedStrain(FALLBACK_DATA.strains);
       applyImageFallbacks();
@@ -515,47 +587,42 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     try {
-      const [strainsRes, merchRes, shopRes] = await Promise.all([
+      const [strainsResult, shopResult] = await Promise.allSettled([
         supabase
           .from('strains')
           .select('slug,name,strain_type,short_description,terpenes,mood_aroma,image_url,image_alt,sort_order,is_featured,updated_at')
           .eq('is_published', true)
           .order('sort_order', { ascending: true }),
         supabase
-          .from('merch_items')
-          .select('slug,name,category,description,bullet_points,image_url,image_alt,cta_label,cta_url,sort_order')
-          .eq('is_published', true)
-          .order('sort_order', { ascending: true }),
-        supabase
           .from('shop_profile')
-          .select('visit_lede,address,hours_text,whatsapp_url,map_embed_url,map_note,visit_note')
+          .select('name,visit_lede,address,hours_text,whatsapp_url,map_embed_url,map_note,visit_note')
           .eq('id', 1)
           .maybeSingle()
       ]);
 
-      if (strainsRes.error || merchRes.error || shopRes.error) {
-        throw new Error('Supabase content query failed');
-      }
+      const strainsRes = strainsResult.status === 'fulfilled' ? strainsResult.value : null;
+      const shopRes = shopResult.status === 'fulfilled' ? shopResult.value : null;
 
-      const strains = Array.isArray(strainsRes.data) && strainsRes.data.length > 0
+      const strains = strainsRes && !strainsRes.error && Array.isArray(strainsRes.data) && strainsRes.data.length > 0
         ? strainsRes.data
         : FALLBACK_DATA.strains;
 
-      const merch = Array.isArray(merchRes.data) && merchRes.data.length > 0
-        ? merchRes.data
-        : FALLBACK_DATA.merch;
+      const shop = shopRes && !shopRes.error && shopRes.data
+        ? shopRes.data
+        : { ...FALLBACK_DATA.shop };
 
-      const shop = shopRes.data || FALLBACK_DATA.shop;
+      if (!shopRes || shopRes.error || !shopRes.data) {
+        const restName = await fetchShopNameViaRest().catch(() => null);
+        if (restName) shop.name = restName;
+      }
 
       applyHomepageStrains(strains);
-      renderMerchItems(merch);
       applyShopProfile(shop);
       applyFeaturedStrain(strains);
       applyImageFallbacks();
     } catch (error) {
       console.error('Failed to load Supabase data. Falling back to local content.', error);
       applyHomepageStrains(FALLBACK_DATA.strains);
-      renderMerchItems(FALLBACK_DATA.merch);
       applyShopProfile(FALLBACK_DATA.shop);
       applyFeaturedStrain(FALLBACK_DATA.strains);
       applyImageFallbacks();

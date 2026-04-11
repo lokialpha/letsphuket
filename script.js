@@ -68,24 +68,4 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Merch image fallback to default photo if missing/broken.
-  document.querySelectorAll('.merch-media img').forEach((img) => {
-    const setFallback = () => {
-      if (img.dataset.fallbackApplied === 'true') return;
-      img.dataset.fallbackApplied = 'true';
-      img.src = defaultStrainImg;
-    };
-
-    img.addEventListener('error', setFallback, { once: true });
-
-    const src = img.getAttribute('src');
-    if (
-      !src ||
-      src.trim() === '' ||
-      src.includes('picsum.photos') ||
-      src.includes('source.unsplash.com')
-    ) {
-      setFallback();
-    }
-  });
 });
