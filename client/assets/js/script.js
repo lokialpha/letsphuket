@@ -8,8 +8,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const defaultStrainImg = '/image/default.jpg';
   const HOMEPAGE_STRAIN_LIMIT = 10;
-  const STRAIN_IMAGE_FETCH_TIMEOUT_MS = 12000;
-  const MAX_HOMEPAGE_IMAGE_FETCHES = 2;
+  const CARD_IMAGE_WIDTH = 640;
+  const CARD_IMAGE_HEIGHT = 390;
   const DEFAULT_SHOP_NAME = "Let's Phuket";
   const SHOP_NAME_CACHE_KEY = 'lp_shop_name_v1';
   const SHOP_NAME_PATTERNS = [/Let['’]s Phuket/g, /Lets Phuket/g];
@@ -17,8 +17,6 @@ document.addEventListener('DOMContentLoaded', () => {
   let activeHomepageFilter = 'all';
   let activeShopName = DEFAULT_SHOP_NAME;
   let brandTextNodes = null;
-  const strainImageCache = new Map();
-  const strainImageInFlight = new Map();
 
   const FALLBACK_SHOP_PROFILE = {
     name: DEFAULT_SHOP_NAME,
@@ -243,10 +241,72 @@ document.addEventListener('DOMContentLoaded', () => {
     return raw.startsWith('image/') ? `/${raw}` : raw;
   }
 
+  function isSupabaseStorageUrl(url) {
+    return /^https?:\/\//i.test(url) && url.includes('/storage/v1/object/');
+  }
+
+  function buildSupabaseThumbUrl(url, options = {}) {
+    try {
+      const parsed = new URL(url);
+      parsed.searchParams.set('width', String(options.width ?? CARD_IMAGE_WIDTH));
+      parsed.searchParams.set('height', String(options.height ?? CARD_IMAGE_HEIGHT));
+      parsed.searchParams.set('resize', 'cover');
+      parsed.searchParams.set('quality', String(options.quality ?? 70));
+      if (options.format) parsed.searchParams.set('format', options.format);
+      else parsed.searchParams.delete('format');
+      return parsed.toString();
+    } catch {
+      return url;
+    }
+  }
+
+  function getCardImageSources(imageUrl) {
+    const originalUrl = resolveImageUrl(imageUrl || defaultStrainImg);
+    if (!isSupabaseStorageUrl(originalUrl)) {
+      return {
+        src: originalUrl,
+        srcset: '',
+        avifSrcset: '',
+        webpSrcset: ''
+      };
+    }
+
+    const fallback1x = buildSupabaseThumbUrl(originalUrl, { quality: 72 });
+    const fallback2x = buildSupabaseThumbUrl(originalUrl, {
+      width: CARD_IMAGE_WIDTH * 2,
+      height: CARD_IMAGE_HEIGHT * 2,
+      quality: 62
+    });
+    const webp1x = buildSupabaseThumbUrl(originalUrl, { format: 'webp', quality: 72 });
+    const webp2x = buildSupabaseThumbUrl(originalUrl, {
+      width: CARD_IMAGE_WIDTH * 2,
+      height: CARD_IMAGE_HEIGHT * 2,
+      format: 'webp',
+      quality: 62
+    });
+    const avif1x = buildSupabaseThumbUrl(originalUrl, { format: 'avif', quality: 62 });
+    const avif2x = buildSupabaseThumbUrl(originalUrl, {
+      width: CARD_IMAGE_WIDTH * 2,
+      height: CARD_IMAGE_HEIGHT * 2,
+      format: 'avif',
+      quality: 54
+    });
+
+    return {
+      src: fallback1x,
+      srcset: `${fallback1x} 1x, ${fallback2x} 2x`,
+      webpSrcset: `${webp1x} 1x, ${webp2x} 2x`,
+      avifSrcset: `${avif1x} 1x, ${avif2x} 2x`
+    };
+  }
+
   function applyImageFallbacks() {
     const setFallback = (img) => {
       if (img.dataset.fallbackApplied === 'true') return;
       img.dataset.fallbackApplied = 'true';
+      img.removeAttribute('srcset');
+      const picture = img.closest('picture');
+      picture?.querySelectorAll('source').forEach((source) => source.remove());
       img.src = defaultStrainImg;
     };
 
@@ -263,137 +323,6 @@ document.addEventListener('DOMContentLoaded', () => {
         setFallback(img);
       }
     });
-  }
-
-  function createTimeoutError(timeoutMs) {
-    const error = new Error(`Image fetch timed out after ${timeoutMs}ms`);
-    error.name = 'TimeoutError';
-    return error;
-  }
-
-  async function fetchStrainImageBySlugWithTimeout(supabase, slug, timeoutMs = STRAIN_IMAGE_FETCH_TIMEOUT_MS) {
-    const controller = new AbortController();
-    let timeoutId = 0;
-
-    const timeoutPromise = new Promise((_, reject) => {
-      timeoutId = window.setTimeout(() => {
-        controller.abort();
-        reject(createTimeoutError(timeoutMs));
-      }, timeoutMs);
-    });
-
-    try {
-      let query = supabase
-        .from('strains')
-        .select('slug,image_url,image_alt')
-        .eq('slug', slug)
-        .eq('is_published', true)
-        .maybeSingle();
-
-      if (typeof query.abortSignal === 'function') {
-        query = query.abortSignal(controller.signal);
-      }
-
-      const result = await Promise.race([query, timeoutPromise]);
-      if (result?.error) throw result.error;
-      return result?.data || null;
-    } catch (error) {
-      if (controller.signal.aborted && error?.name !== 'TimeoutError') {
-        throw createTimeoutError(timeoutMs);
-      }
-      throw error;
-    } finally {
-      window.clearTimeout(timeoutId);
-    }
-  }
-
-  function cacheHomepageStrainImage(slug, payload) {
-    if (!slug || !payload?.image_url) return;
-    const normalizedSlug = String(slug).toLowerCase();
-    const target = homepageAllStrains.find((item) => String(item?.slug || '').toLowerCase() === normalizedSlug);
-    if (!target) return;
-    target.image_url = payload.image_url;
-    if (payload.image_alt) target.image_alt = payload.image_alt;
-  }
-
-  async function getStrainImageBySlug(supabase, slug) {
-    const normalizedSlug = String(slug || '').trim().toLowerCase();
-    if (!normalizedSlug) return null;
-
-    if (strainImageCache.has(normalizedSlug)) {
-      return strainImageCache.get(normalizedSlug);
-    }
-
-    if (strainImageInFlight.has(normalizedSlug)) {
-      return strainImageInFlight.get(normalizedSlug);
-    }
-
-    const request = (async () => {
-      try {
-        const data = await fetchStrainImageBySlugWithTimeout(supabase, normalizedSlug, STRAIN_IMAGE_FETCH_TIMEOUT_MS);
-        const imageUrl = String(data?.image_url || '').trim();
-        const imageAlt = String(data?.image_alt || '').trim();
-        if (!imageUrl) return null;
-
-        const payload = { image_url: imageUrl, image_alt: imageAlt || null };
-        strainImageCache.set(normalizedSlug, payload);
-        cacheHomepageStrainImage(normalizedSlug, payload);
-        return payload;
-      } catch (error) {
-        console.warn(`Failed to hydrate image for slug "${normalizedSlug}".`, error);
-        return null;
-      } finally {
-        strainImageInFlight.delete(normalizedSlug);
-      }
-    })();
-
-    strainImageInFlight.set(normalizedSlug, request);
-    return request;
-  }
-
-  async function hydrateHomepageCardImages() {
-    const supabase = getSupabaseClient();
-    if (!supabase) return;
-
-    const imageNodes = Array.from(document.querySelectorAll('#strain-grid .strain-media img[data-strain-slug]'))
-      .filter((img) => img.dataset.imageHydrated !== 'true');
-    if (!imageNodes.length) return;
-
-    const nodesBySlug = new Map();
-    imageNodes.forEach((img) => {
-      const slug = String(img.dataset.strainSlug || '').trim().toLowerCase();
-      if (!slug) return;
-      if (!nodesBySlug.has(slug)) nodesBySlug.set(slug, []);
-      nodesBySlug.get(slug).push(img);
-    });
-
-    const slugs = Array.from(nodesBySlug.keys());
-    if (!slugs.length) return;
-
-    let cursor = 0;
-    const workerCount = Math.min(MAX_HOMEPAGE_IMAGE_FETCHES, slugs.length);
-
-    const workers = Array.from({ length: workerCount }, async () => {
-      while (cursor < slugs.length) {
-        const slug = slugs[cursor];
-        cursor += 1;
-
-        const payload = await getStrainImageBySlug(supabase, slug);
-        const targets = nodesBySlug.get(slug) || [];
-
-        targets.forEach((img) => {
-          if (payload?.image_url) {
-            img.src = resolveImageUrl(payload.image_url);
-            if (payload.image_alt) img.alt = payload.image_alt;
-          }
-          img.dataset.imageHydrated = 'true';
-          img.dataset.fallbackApplied = 'false';
-        });
-      }
-    });
-
-    await Promise.all(workers);
-    applyImageFallbacks();
   }
 
   function setHomepageLoadingState() {
@@ -418,17 +347,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const strainGrid = document.getElementById('strain-grid');
     if (!strainGrid) return;
 
-    strainGrid.innerHTML = strains.map((strain) => {
+    strainGrid.innerHTML = strains.map((strain, index) => {
       const type = normalizeType(strain.strain_type);
       const terpenes = formatList(strain.terpenes);
       const slug = String(strain.slug || '');
       const detailHref = `client/pages/strain.html?slug=${encodeURIComponent(slug)}`;
-      const hasImage = Boolean(String(strain.image_url || '').trim());
+      const image = getCardImageSources(strain.image_url || defaultStrainImg);
+      const imgAlt = escapeHtml(strain.image_alt || `${strain.name} strain flower`);
+      const imgSizes = '(max-width: 640px) calc(100vw - 48px), (max-width: 1100px) calc(50vw - 40px), 280px';
+      const isPriorityImage = index < 2;
       return `
         <a class="strain-card-link" href="${detailHref}">
           <article class="strain-card">
             <div class="strain-media">
-              <img src="${escapeHtml(resolveImageUrl(strain.image_url || defaultStrainImg))}" alt="${escapeHtml(strain.image_alt || `${strain.name} strain flower`)}" loading="lazy" data-strain-slug="${escapeHtml(slug)}" data-image-hydrated="${hasImage ? 'true' : 'false'}">
+              <picture>
+                ${image.avifSrcset ? `<source type="image/avif" srcset="${escapeHtml(image.avifSrcset)}" sizes="${imgSizes}">` : ''}
+                ${image.webpSrcset ? `<source type="image/webp" srcset="${escapeHtml(image.webpSrcset)}" sizes="${imgSizes}">` : ''}
+                <img src="${escapeHtml(image.src)}" ${image.srcset ? `srcset="${escapeHtml(image.srcset)}"` : ''} sizes="${imgSizes}" alt="${imgAlt}" loading="${isPriorityImage ? 'eager' : 'lazy'}" fetchpriority="${isPriorityImage ? 'high' : 'auto'}" decoding="async" width="${CARD_IMAGE_WIDTH}" height="${CARD_IMAGE_HEIGHT}">
+              </picture>
             </div>
             <div class="strain-top">
               <div class="leaf-icon" aria-hidden="true">${LEAF_ICON}</div>
@@ -472,7 +408,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     applyImageFallbacks();
-    void hydrateHomepageCardImages();
   }
 
   function applyHomepageStrains(strains) {
@@ -662,7 +597,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const [strainsResult, shopResult] = await Promise.allSettled([
         supabase
           .from('strains')
-          .select('slug,name,strain_type,short_description,terpenes,mood_aroma,sort_order,is_featured,updated_at')
+          .select('slug,name,strain_type,short_description,terpenes,mood_aroma,image_url,image_alt,sort_order,is_featured,updated_at')
           .eq('is_published', true)
           .order('sort_order', { ascending: true }),
         supabase

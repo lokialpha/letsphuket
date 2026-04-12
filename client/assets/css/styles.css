@@ -753,6 +753,10 @@ a {
   gap: 6px;
 }
 
+.footer-brand-title {
+  align-items: center;
+}
+
 .footer-note {
   margin: 0;
   color: var(--muted);
@@ -763,6 +767,16 @@ a {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.footer-signature {
+  width: 100%;
+  margin: 0;
+  text-align: right;
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
 }
 
 .legal-title {

@@ -51,3 +51,28 @@ If your project was created before admin image uploads to Supabase Storage, also
 
 To remove the original demo strains from older databases, run:
 - [`migrations/20260413_delete_old_seed_strains.sql`](./migrations/20260413_delete_old_seed_strains.sql)
+
+To block new `data:image/...` URLs from being stored in `strains.image_url`, run:
+- [`migrations/20260413_block_data_uri_strain_images.sql`](./migrations/20260413_block_data_uri_strain_images.sql)
+
+## 6) Convert legacy base64 `image_url` rows to Storage URLs
+If your `strains.image_url` contains large `data:image/...;base64,...` values, convert them to files in Supabase Storage first:
+
+```bash
+# Dry-run (read-only)
+node supabase/scripts/migrate-strain-data-uri-images.mjs --dry-run
+
+# Apply migration with service role key (recommended)
+SUPABASE_SERVICE_ROLE_KEY=... \
+node supabase/scripts/migrate-strain-data-uri-images.mjs --apply
+
+# Or apply with admin user credentials (must be in public.admin_users)
+SUPABASE_EMAIL=admin@example.com \
+SUPABASE_PASSWORD=... \
+node supabase/scripts/migrate-strain-data-uri-images.mjs --apply
+```
+
+Notes:
+- Script reads `SUPABASE_URL` from env or `../supabase-config.js`.
+- Upload target bucket is `strain-images`.
+- The script is idempotent (`x-upsert=true`) and can be rerun safely.

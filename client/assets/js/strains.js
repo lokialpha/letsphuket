@@ -16,8 +16,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const PAGE_SIZE = 12;
   const STRAIN_DETAIL_PREFETCH_KEY_PREFIX = 'lp_strain_prefetch_v1:';
   const LIVE_SYNC_TIMEOUT_MS = 7000;
-  const STRAIN_IMAGE_FETCH_TIMEOUT_MS = 12000;
-  const MAX_PARALLEL_IMAGE_FETCHES = 2;
   const VALID_STRAIN_FILTERS = ['all', 'sativa', 'indica', 'hybrid'];
   const CARD_IMAGE_WIDTH = 640;
   const CARD_IMAGE_HEIGHT = 390;
@@ -149,9 +147,6 @@ document.addEventListener('DOMContentLoaded', () => {
   let visibleCount = 0;
   let activeFilter = 'all';
   let searchQuery = '';
-  let imageHydrationSupabase = null;
-  const strainImageCache = new Map();
-  const strainImageInFlight = new Map();
   const prefetchedDetailDocuments = new Set();
   const prefetchedDetailSlugs = new Set();
   const supportsLinkPrefetch = (() => {
@@ -361,6 +356,32 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
+  function setCardImageFallback(img) {
+    if (!img || img.dataset.fallbackApplied === 'true') return;
+
+    img.dataset.fallbackApplied = 'true';
+    img.removeAttribute('srcset');
+    const picture = img.closest('picture');
+    picture?.querySelectorAll('source').forEach((source) => source.remove());
+    img.src = defaultStrainImg;
+  }
+
+  function bindCardImageFallbacks() {
+    if (!grid) return;
+
+    grid.querySelectorAll('.strain-media img').forEach((img) => {
+      if (img.dataset.fallbackBound === 'true') return;
+      img.dataset.fallbackBound = 'true';
+
+      img.addEventListener('error', () => {
+        setCardImageFallback(img);
+      });
+
+      const src = String(img.getAttribute('src') || '').trim();
+      if (!src) setCardImageFallback(img);
+    });
+  }
+
   function getSupabaseClient() {
     const cfg = window.__SUPABASE_CONFIG__;
     const createClient = window.supabase?.createClient;
@@ -373,129 +394,6 @@ document.addEventListener('DOMContentLoaded', () => {
     return createClient(cfg.url, cfg.anonKey, {
       auth: { persistSession: false }
     });
-  }
-
-  async function fetchStrainImageBySlugWithTimeout(supabase, slug, timeoutMs = STRAIN_IMAGE_FETCH_TIMEOUT_MS) {
-    const controller = new AbortController();
-    let timeoutId = 0;
-
-    const timeoutPromise = new Promise((_, reject) => {
-      timeoutId = window.setTimeout(() => {
-        controller.abort();
-        reject(createTimeoutError(timeoutMs));
-      }, timeoutMs);
-    });
-
-    try {
-      let query = supabase
-        .from('strains')
-        .select('slug,image_url,image_alt')
-        .eq('slug', slug)
-        .eq('is_published', true)
-        .maybeSingle();
-
-      if (typeof query.abortSignal === 'function') {
-        query = query.abortSignal(controller.signal);
-      }
-
-      const result = await Promise.race([query, timeoutPromise]);
-      if (result?.error) throw result.error;
-      return result?.data || null;
-    } catch (error) {
-      if (controller.signal.aborted && error?.name !== 'TimeoutError') {
-        throw createTimeoutError(timeoutMs);
-      }
-      throw error;
-    } finally {
-      window.clearTimeout(timeoutId);
-    }
-  }
-
-  function cacheStrainImage(slug, payload) {
-    if (!slug || !payload?.image_url) return;
-    const normalizedSlug = String(slug).toLowerCase();
-    const target = strainBySlug.get(normalizedSlug);
-    if (!target) return;
-    target.image_url = payload.image_url;
-    if (payload.image_alt) target.image_alt = payload.image_alt;
-  }
-
-  async function getStrainImageBySlug(supabase, slug) {
-    const normalizedSlug = String(slug || '').trim().toLowerCase();
-    if (!normalizedSlug) return null;
-
-    if (strainImageCache.has(normalizedSlug)) {
-      return strainImageCache.get(normalizedSlug);
-    }
-
-    if (strainImageInFlight.has(normalizedSlug)) {
-      return strainImageInFlight.get(normalizedSlug);
-    }
-
-    const request = (async () => {
-      try {
-        const data = await fetchStrainImageBySlugWithTimeout(supabase, normalizedSlug, STRAIN_IMAGE_FETCH_TIMEOUT_MS);
-        const imageUrl = String(data?.image_url || '').trim();
-        const imageAlt = String(data?.image_alt || '').trim();
-        if (!imageUrl) return null;
-
-        const payload = { image_url: imageUrl, image_alt: imageAlt || null };
-        strainImageCache.set(normalizedSlug, payload);
-        cacheStrainImage(normalizedSlug, payload);
-        return payload;
-      } catch (error) {
-        console.warn(`Failed to hydrate image for slug "${normalizedSlug}".`, error);
-        return null;
-      } finally {
-        strainImageInFlight.delete(normalizedSlug);
-      }
-    })();
-
-    strainImageInFlight.set(normalizedSlug, request);
-    return request;
-  }
-
-  async function hydrateRenderedCardImages() {
-    const supabase = imageHydrationSupabase || getSupabaseClient();
-    if (!supabase || !grid) return;
-
-    const imageNodes = Array.from(grid.querySelectorAll('.strain-media img[data-strain-slug]'))
-      .filter((img) => img.dataset.imageHydrated !== 'true');
-    if (!imageNodes.length) return;
-
-    const nodesBySlug = new Map();
-    imageNodes.forEach((img) => {
-      const slug = String(img.dataset.strainSlug || '').trim().toLowerCase();
-      if (!slug) return;
-      if (!nodesBySlug.has(slug)) nodesBySlug.set(slug, []);
-      nodesBySlug.get(slug).push(img);
-    });
-
-    const slugs = Array.from(nodesBySlug.keys());
-    if (!slugs.length) return;
-
-    let cursor = 0;
-    const workerCount = Math.min(MAX_PARALLEL_IMAGE_FETCHES, slugs.length);
-
-    const workers = Array.from({ length: workerCount }, async () => {
-      while (cursor < slugs.length) {
-        const slug = slugs[cursor];
-        cursor += 1;
-
-        const payload = await getStrainImageBySlug(supabase, slug);
-        const targets = nodesBySlug.get(slug) || [];
-
-        targets.forEach((img) => {
-          if (payload?.image_url) {
-            img.src = resolveImageUrl(payload.image_url);
-            if (payload.image_alt) img.alt = payload.image_alt;
-          }
-          img.dataset.imageHydrated = 'true';
-        });
-      }
-    });
-
-    await Promise.all(workers);
   }
 
   function writePrefetchedStrainDetail(strain) {
@@ -596,7 +494,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       let query = supabase
         .from('strains')
-        .select('slug,name,strain_type,short_description,terpenes,mood_aroma,sort_order')
+        .select('slug,name,strain_type,short_description,terpenes,mood_aroma,image_url,image_alt,sort_order')
         .eq('is_published', true)
         .order('sort_order', { ascending: true });
 
@@ -617,7 +515,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderCards(items, append = false) {
     if (!grid) return;
-    const html = items.map((strain) => {
+    const html = items.map((strain, index) => {
       const type = normalizeType(strain.strain_type);
       const terpenes = formatList(strain.terpenes);
       const slug = String(strain.slug || '');
@@ -625,7 +523,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const image = getCardImageSources(strain.image_url || defaultStrainImg);
       const imgAlt = escapeHtml(strain.image_alt || `${strain.name} strain flower`);
       const imgSizes = '(max-width: 640px) calc(100vw - 48px), (max-width: 1100px) calc(50vw - 40px), 280px';
-      const hasImage = Boolean(String(strain.image_url || '').trim());
+      const isPriorityImage = !append && index < 2;
 
       return `
         <a class="strain-card-link" href="${detailHref}">
@@ -634,7 +532,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <picture>
                 ${image.avifSrcset ? `<source type="image/avif" srcset="${escapeHtml(image.avifSrcset)}" sizes="${imgSizes}">` : ''}
                 ${image.webpSrcset ? `<source type="image/webp" srcset="${escapeHtml(image.webpSrcset)}" sizes="${imgSizes}">` : ''}
-                <img src="${escapeHtml(image.src)}" ${image.srcset ? `srcset="${escapeHtml(image.srcset)}"` : ''} sizes="${imgSizes}" alt="${imgAlt}" loading="lazy" decoding="async" width="${CARD_IMAGE_WIDTH}" height="${CARD_IMAGE_HEIGHT}" data-strain-slug="${escapeHtml(slug)}" data-image-hydrated="${hasImage ? 'true' : 'false'}">
+                <img src="${escapeHtml(image.src)}" ${image.srcset ? `srcset="${escapeHtml(image.srcset)}"` : ''} sizes="${imgSizes}" alt="${imgAlt}" loading="${isPriorityImage ? 'eager' : 'lazy'}" fetchpriority="${isPriorityImage ? 'high' : 'auto'}" decoding="async" width="${CARD_IMAGE_WIDTH}" height="${CARD_IMAGE_HEIGHT}">
               </picture>
             </div>
             <div class="strain-top">
@@ -656,7 +554,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (append) grid.insertAdjacentHTML('beforeend', html);
     else grid.innerHTML = html;
     bindDetailPrefetchHandlers();
-    void hydrateRenderedCardImages();
+    bindCardImageFallbacks();
   }
 
   function bindDetailPrefetchHandlers() {
@@ -712,7 +610,6 @@ document.addEventListener('DOMContentLoaded', () => {
   async function loadAllStrainsInBackground() {
     const supabase = getSupabaseClient();
     if (!supabase) {
-      imageHydrationSupabase = null;
       fetchShopNameViaRest()
         .then((name) => {
           if (name) applyLiveShopName(name);
@@ -724,7 +621,6 @@ document.addEventListener('DOMContentLoaded', () => {
       setLiveUnavailableStatus();
       return;
     }
-    imageHydrationSupabase = supabase;
 
     (async () => {
       try {

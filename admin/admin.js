@@ -1167,6 +1167,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const slug = toSlug(rawSlug || name);
     const descriptionEn = inputDescriptionEn.value.trim();
     const descriptionMm = inputDescriptionMm.value.trim();
+    const imageUrl = inputImageUrl.value.trim();
+
+    if (/^data:image\//i.test(imageUrl)) {
+      throw new Error('Image URL cannot be a data URI. Upload image file to Supabase Storage and use the generated URL.');
+    }
 
     return {
       name,
@@ -1178,7 +1183,7 @@ document.addEventListener('DOMContentLoaded', () => {
       description_mm: descriptionMm || null,
       mood_aroma: inputMoodAroma.value.trim(),
       terpenes: parseTerpenes(inputTerpenes.value),
-      image_url: inputImageUrl.value.trim() || null,
+      image_url: imageUrl || null,
       image_alt: inputImageAlt.value.trim() || null,
       is_featured: inputFeatured.checked,
       is_published: inputPublished.checked
@@ -1190,7 +1195,15 @@ document.addEventListener('DOMContentLoaded', () => {
     setFormMessage('Saving...', '');
 
     const id = inputId.value.trim();
-    const payload = getPayloadFromForm();
+    const currentId = id ? Number(id) : null;
+    let payload;
+    try {
+      payload = getPayloadFromForm();
+    } catch (error) {
+      setFormMessage('', error.message || 'Invalid strain input.');
+      return;
+    }
+
     const legacyPayload = { ...payload };
     delete legacyPayload.description_en;
     delete legacyPayload.description_mm;
@@ -1200,10 +1213,25 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    let previouslyFeaturedIds = [];
     if (payload.is_featured) {
+      const { data: featuredRows, error: featuredFetchError } = await supabase
+        .from('strains')
+        .select('id')
+        .eq('is_featured', true);
+
+      if (featuredFetchError) {
+        setFormMessage('', `Save failed: ${featuredFetchError.message}`);
+        return;
+      }
+
+      previouslyFeaturedIds = (featuredRows || [])
+        .map((row) => Number(row?.id))
+        .filter((value) => Number.isFinite(value) && value !== currentId);
+
       const clearFeaturedQuery = supabase.from('strains').update({ is_featured: false });
       const { error: clearFeaturedError } = id
-        ? await clearFeaturedQuery.neq('id', Number(id))
+        ? await clearFeaturedQuery.neq('id', currentId)
         : await clearFeaturedQuery;
 
       if (clearFeaturedError) {
@@ -1235,6 +1263,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (error) {
+      if (payload.is_featured && previouslyFeaturedIds.length) {
+        const { error: restoreFeaturedError } = await supabase
+          .from('strains')
+          .update({ is_featured: true })
+          .in('id', previouslyFeaturedIds);
+
+        if (restoreFeaturedError) {
+          setFormMessage('', `Save failed: ${error.message}. Also failed to restore previous featured strain: ${restoreFeaturedError.message}`);
+          return;
+        }
+      }
+
       setFormMessage('', `Save failed: ${error.message}`);
       return;
     }
