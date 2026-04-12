@@ -120,6 +120,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const VIEW_NAMES = new Set(['overview', 'strains', 'shop']);
   const MAX_IMAGE_FILE_SIZE_BYTES = 5 * 1024 * 1024;
   const SHOP_NAME_CACHE_KEY = 'lp_shop_name_v1';
+  const STRAIN_IMAGE_BUCKET = 'strain-images';
+  const STRAIN_IMAGE_PATH_PREFIX = 'strains';
+  const STRAIN_IMAGE_UPLOAD_CACHE_SECONDS = '31536000';
   const STRAINS_SELECT_WITH_I18N = 'id,slug,name,strain_type,short_description,description_en,description_mm,terpenes,mood_aroma,image_url,image_alt,is_featured,is_published,sort_order,updated_at';
   const STRAINS_SELECT_LEGACY = 'id,slug,name,strain_type,short_description,terpenes,mood_aroma,image_url,image_alt,is_featured,is_published,sort_order,updated_at';
 
@@ -227,15 +230,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  function fileToDataUrl(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result || ''));
-      reader.onerror = () => reject(new Error('File read failed.'));
-      reader.readAsDataURL(file);
-    });
-  }
-
   function getAltFromFileName(fileName) {
     const base = String(fileName || '')
       .replace(/\.[^/.]+$/, '')
@@ -243,6 +237,70 @@ document.addEventListener('DOMContentLoaded', () => {
       .trim();
     if (!base) return '';
     return `${base} strain flower`;
+  }
+
+  function getFileExtensionFromName(fileName) {
+    const extension = String(fileName || '')
+      .toLowerCase()
+      .split('.')
+      .pop();
+    if (!extension || extension === String(fileName || '').toLowerCase()) return '';
+    return extension.replace(/[^a-z0-9]/g, '');
+  }
+
+  function getFileExtensionFromMime(mimeType) {
+    const mime = String(mimeType || '').toLowerCase();
+    if (mime.includes('jpeg')) return 'jpg';
+    if (mime.includes('png')) return 'png';
+    if (mime.includes('webp')) return 'webp';
+    if (mime.includes('gif')) return 'gif';
+    if (mime.includes('avif')) return 'avif';
+    if (mime.includes('svg')) return 'svg';
+    return '';
+  }
+
+  function resolveUploadFileExtension(file) {
+    const byName = getFileExtensionFromName(file?.name);
+    if (byName) return byName;
+    const byMime = getFileExtensionFromMime(file?.type);
+    if (byMime) return byMime;
+    return 'bin';
+  }
+
+  function buildStorageImagePath(file) {
+    const sourceSlug = toSlug(inputSlug.value.trim() || inputName.value.trim() || 'strain');
+    const slug = sourceSlug || 'strain';
+    const extension = resolveUploadFileExtension(file);
+    const timestamp = Date.now();
+    const suffix = Math.random().toString(36).slice(2, 8);
+    return `${STRAIN_IMAGE_PATH_PREFIX}/${slug}/${timestamp}-${suffix}.${extension}`;
+  }
+
+  async function uploadImageFileToStorage(file) {
+    if (!supabase) {
+      throw new Error('Supabase client is not initialized.');
+    }
+
+    const bucket = supabase.storage.from(STRAIN_IMAGE_BUCKET);
+    const path = buildStorageImagePath(file);
+
+    const { error: uploadError } = await bucket.upload(path, file, {
+      cacheControl: STRAIN_IMAGE_UPLOAD_CACHE_SECONDS,
+      upsert: false,
+      contentType: file.type || 'application/octet-stream'
+    });
+
+    if (uploadError) {
+      throw uploadError;
+    }
+
+    const { data } = bucket.getPublicUrl(path);
+    const publicUrl = String(data?.publicUrl || '').trim();
+    if (!publicUrl) {
+      throw new Error('Uploaded image but failed to resolve public URL.');
+    }
+
+    return publicUrl;
   }
 
   function setOverviewStrainsSync(label) {
@@ -887,13 +945,11 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    setFormMessage('Processing image file...', '');
+    setFormMessage('Uploading image to storage...', '');
 
     try {
-      const dataUrl = await fileToDataUrl(file);
-      if (!dataUrl) throw new Error('Image conversion returned empty result.');
-
-      inputImageUrl.value = dataUrl;
+      const uploadedUrl = await uploadImageFileToStorage(file);
+      inputImageUrl.value = uploadedUrl;
 
       if (!inputImageAlt.value.trim()) {
         const alt = getAltFromFileName(file.name);
@@ -902,10 +958,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
       updateImagePreview();
       updateDirtyState();
-      setFormMessage('Image added. Preview updated.', '');
-      showToast('Image added to form.', 'success');
-    } catch (_error) {
-      setFormMessage('', 'Could not process the selected image file.');
+      setFormMessage('Image uploaded. Preview updated.', '');
+      showToast('Image uploaded to Supabase Storage.', 'success');
+    } catch (error) {
+      const message = String(error?.message || '').trim() || 'Could not upload image file.';
+      if (message.toLowerCase().includes('bucket')) {
+        setFormMessage('', `Image upload failed: ${message}. Run storage bucket migration SQL first.`);
+      } else {
+        setFormMessage('', `Image upload failed: ${message}`);
+      }
     } finally {
       inputImageFile.value = '';
     }

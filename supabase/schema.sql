@@ -196,34 +196,75 @@ grant select on public.admin_users to authenticated;
 grant insert, update, delete on public.strains, public.merch_items, public.shop_profile to authenticated;
 grant usage, select on all sequences in schema public to authenticated;
 
-insert into public.strains (
-  slug, name, strain_type, short_description, description_en, description_mm, terpenes, mood_aroma, image_url, image_alt, is_featured, is_published, sort_order
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'strain-images',
+  'strain-images',
+  true,
+  5242880,
+  array[
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'image/avif',
+    'image/gif',
+    'image/svg+xml'
+  ]
 )
-values
-  ('tropical-cherry', 'Tropical Cherry', 'hybrid', 'Cherry gelato with papaya diesel - sticky resin and a blissy, island glow.', 'Cherry gelato with papaya diesel - sticky resin and a blissy, island glow.', null, array['Limonene', 'Myrcene'], 'Blissed - Heavy', 'image/default.jpg', 'Tropical Cherry strain flower', false, true, 1),
-  ('subzero', 'Subzero', 'hybrid', 'Frosty gas with minty inhale and a clear, chilled headspace.', 'Frosty gas with minty inhale and a clear, chilled headspace.', null, array['Caryophyllene', 'Limonene'], 'Icy - Focused', 'image/default.jpg', 'Subzero strain flower', false, true, 2),
-  ('banana-daddy', 'Banana Daddy', 'indica', 'Ripe banana bread and grape candy with a mellow, grinny body feel.', 'Ripe banana bread and grape candy with a mellow, grinny body feel.', null, array['Myrcene', 'Linalool'], 'Cozy - Euphoric', 'image/default.jpg', 'Banana Daddy strain flower', false, true, 3),
-  ('blueberry-muffin', 'BlueBerry Muffin', 'hybrid', 'Warm blueberry muffin nose with a creamy finish and calming exhale.', 'Warm blueberry muffin nose with a creamy finish and calming exhale.', null, array['Myrcene', 'Pinene'], 'Happy - Relaxed', 'image/default.jpg', 'BlueBerry Muffin strain flower', false, true, 4),
-  ('pink-runtz', 'Pink Runtz', 'hybrid', 'Cotton candy and tropical sherbet with a mellow, floaty lift.', 'Cotton candy and tropical sherbet with a mellow, floaty lift.', null, array['Caryophyllene', 'Limonene'], 'Euphoric - Social', 'image/default.jpg', 'Pink Runtz strain flower', false, true, 5),
-  ('tea-time', 'Tea Time', 'hybrid', 'Earl grey, lemon zest, and a smooth calm that stays clear and chatty.', 'Earl grey, lemon zest, and a smooth calm that stays clear and chatty.', null, array['Linalool', 'Caryophyllene'], 'Calm - Focused', 'image/Teatime.jpg', 'Tea Time strain flower', true, true, 6),
-  ('lgbtq', 'LGBTQ', 'sativa', 'Rainbow sherbet nose with passionfruit pop and an upbeat social lift.', 'Rainbow sherbet nose with passionfruit pop and an upbeat social lift.', null, array['Limonene', 'Terpinolene'], 'Uplifted - Creative', 'image/LGBTQ.jpg', 'LGBTQ strain flower', false, true, 7),
-  ('zupa', 'ZuPa', 'hybrid', 'Tropical candy with creamy gas and a floaty, euphoric body melt.', 'Tropical candy with creamy gas and a floaty, euphoric body melt.', null, array['Myrcene', 'Caryophyllene'], 'Relaxed - Euphoric', 'image/Zupa.jpg', 'ZuPa strain flower', false, true, 8),
-  ('neon-icon', 'Neon Icon', 'sativa', 'Electric citrus and guava ice that keeps conversations bright and focused.', 'Electric citrus and guava ice that keeps conversations bright and focused.', null, array['Ocimene', 'Limonene'], 'Social - Focused', 'image/Neonicon.jpg', 'Neon Icon strain flower', false, true, 9),
-  ('super-boof', 'Super Boof', 'hybrid', 'Tangerine peel with earthy cookie, floaty chatter without the couch-lock.', 'Tangerine peel with earthy cookie, floaty chatter without the couch-lock.', null, array['Caryophyllene', 'Linalool'], 'Talkative - Relaxed', 'image/default.jpg', 'Super Boof strain flower', false, true, 10)
-on conflict (slug) do update set
-  name = excluded.name,
-  strain_type = excluded.strain_type,
-  short_description = excluded.short_description,
-  description_en = excluded.description_en,
-  description_mm = excluded.description_mm,
-  terpenes = excluded.terpenes,
-  mood_aroma = excluded.mood_aroma,
-  image_url = excluded.image_url,
-  image_alt = excluded.image_alt,
-  is_featured = excluded.is_featured,
-  is_published = excluded.is_published,
-  sort_order = excluded.sort_order,
-  updated_at = now();
+on conflict (id) do update set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
+grant usage on schema storage to anon, authenticated;
+grant select on table storage.objects to anon, authenticated;
+grant insert, update, delete on table storage.objects to authenticated;
+
+alter table if exists storage.objects enable row level security;
+
+drop policy if exists strain_images_public_read on storage.objects;
+create policy strain_images_public_read
+on storage.objects
+for select
+to anon, authenticated
+using (bucket_id = 'strain-images');
+
+drop policy if exists strain_images_admin_insert on storage.objects;
+create policy strain_images_admin_insert
+on storage.objects
+for insert
+to authenticated
+with check (
+  bucket_id = 'strain-images'
+  and public.is_admin()
+);
+
+drop policy if exists strain_images_admin_update on storage.objects;
+create policy strain_images_admin_update
+on storage.objects
+for update
+to authenticated
+using (
+  bucket_id = 'strain-images'
+  and public.is_admin()
+)
+with check (
+  bucket_id = 'strain-images'
+  and public.is_admin()
+);
+
+drop policy if exists strain_images_admin_delete on storage.objects;
+create policy strain_images_admin_delete
+on storage.objects
+for delete
+to authenticated
+using (
+  bucket_id = 'strain-images'
+  and public.is_admin()
+);
+
+-- Strains are intentionally not auto-seeded here.
+-- Use the admin panel to create your live catalog.
 
 insert into public.merch_items (
   slug, name, category, description, bullet_points, image_url, image_alt, cta_label, cta_url, is_published, sort_order

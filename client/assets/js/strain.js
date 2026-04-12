@@ -6,10 +6,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const page = document.getElementById('page');
 
   const defaultStrainImg = '/image/default.jpg';
-  const STRAINS_CACHE_KEY = 'lp_strains_cache_v1';
-  const STRAINS_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
-  const STRAIN_DETAIL_PREFETCH_KEY_PREFIX = 'lp_strain_prefetch_v1:';
-  const STRAIN_DETAIL_PREFETCH_MAX_AGE_MS = 30 * 60 * 1000;
   const DEFAULT_SHOP_NAME = "Let's Phuket";
   const SHOP_NAME_CACHE_KEY = 'lp_shop_name_v1';
   const SHOP_NAME_PATTERNS = [/Let['’]s Phuket/g, /Lets Phuket/g];
@@ -20,109 +16,6 @@ document.addEventListener('DOMContentLoaded', () => {
   let activeDescriptionLanguage = DEFAULT_DESCRIPTION_LANGUAGE;
   let activeStrainDetail = null;
   const descriptionLanguageButtons = Array.from(document.querySelectorAll('[data-description-lang]'));
-
-  const FALLBACK_STRAINS = [
-    {
-      slug: 'tropical-cherry',
-      name: 'Tropical Cherry',
-      strain_type: 'Hybrid',
-      short_description: 'Cherry gelato with papaya diesel - sticky resin and a blissy, island glow.',
-      terpenes: ['Limonene', 'Myrcene'],
-      mood_aroma: 'Blissed - Heavy',
-      image_url: 'image/default.jpg',
-      image_alt: 'Tropical Cherry strain flower'
-    },
-    {
-      slug: 'subzero',
-      name: 'Subzero',
-      strain_type: 'Hybrid',
-      short_description: 'Frosty gas with minty inhale and a clear, chilled headspace.',
-      terpenes: ['Caryophyllene', 'Limonene'],
-      mood_aroma: 'Icy - Focused',
-      image_url: 'image/default.jpg',
-      image_alt: 'Subzero strain flower'
-    },
-    {
-      slug: 'banana-daddy',
-      name: 'Banana Daddy',
-      strain_type: 'Indica',
-      short_description: 'Ripe banana bread and grape candy with a mellow, grinny body feel.',
-      terpenes: ['Myrcene', 'Linalool'],
-      mood_aroma: 'Cozy - Euphoric',
-      image_url: 'image/default.jpg',
-      image_alt: 'Banana Daddy strain flower'
-    },
-    {
-      slug: 'blueberry-muffin',
-      name: 'BlueBerry Muffin',
-      strain_type: 'Hybrid',
-      short_description: 'Warm blueberry muffin nose with a creamy finish and calming exhale.',
-      terpenes: ['Myrcene', 'Pinene'],
-      mood_aroma: 'Happy - Relaxed',
-      image_url: 'image/default.jpg',
-      image_alt: 'BlueBerry Muffin strain flower'
-    },
-    {
-      slug: 'pink-runtz',
-      name: 'Pink Runtz',
-      strain_type: 'Hybrid',
-      short_description: 'Cotton candy and tropical sherbet with a mellow, floaty lift.',
-      terpenes: ['Caryophyllene', 'Limonene'],
-      mood_aroma: 'Euphoric - Social',
-      image_url: 'image/default.jpg',
-      image_alt: 'Pink Runtz strain flower'
-    },
-    {
-      slug: 'tea-time',
-      name: 'Tea Time',
-      strain_type: 'Hybrid',
-      short_description: 'Earl grey, lemon zest, and a smooth calm that stays clear and chatty.',
-      terpenes: ['Linalool', 'Caryophyllene'],
-      mood_aroma: 'Calm - Focused',
-      image_url: 'image/Teatime.jpg',
-      image_alt: 'Tea Time strain flower'
-    },
-    {
-      slug: 'lgbtq',
-      name: 'LGBTQ',
-      strain_type: 'Sativa',
-      short_description: 'Rainbow sherbet nose with passionfruit pop and an upbeat social lift.',
-      terpenes: ['Limonene', 'Terpinolene'],
-      mood_aroma: 'Uplifted - Creative',
-      image_url: 'image/LGBTQ.jpg',
-      image_alt: 'LGBTQ strain flower'
-    },
-    {
-      slug: 'zupa',
-      name: 'ZuPa',
-      strain_type: 'Hybrid',
-      short_description: 'Tropical candy with creamy gas and a floaty, euphoric body melt.',
-      terpenes: ['Myrcene', 'Caryophyllene'],
-      mood_aroma: 'Relaxed - Euphoric',
-      image_url: 'image/Zupa.jpg',
-      image_alt: 'ZuPa strain flower'
-    },
-    {
-      slug: 'neon-icon',
-      name: 'Neon Icon',
-      strain_type: 'Sativa',
-      short_description: 'Electric citrus and guava ice that keeps conversations bright and focused.',
-      terpenes: ['Ocimene', 'Limonene'],
-      mood_aroma: 'Social - Focused',
-      image_url: 'image/Neonicon.jpg',
-      image_alt: 'Neon Icon strain flower'
-    },
-    {
-      slug: 'super-boof',
-      name: 'Super Boof',
-      strain_type: 'Hybrid',
-      short_description: 'Tangerine peel with earthy cookie, floaty chatter without the couch-lock.',
-      terpenes: ['Caryophyllene', 'Linalool'],
-      mood_aroma: 'Talkative - Relaxed',
-      image_url: 'image/default.jpg',
-      image_alt: 'Super Boof strain flower'
-    }
-  ];
 
   function normalizeShopName(value) {
     const name = String(value || '').trim();
@@ -356,57 +249,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  function readPrefetchedStrainDetail(slug) {
-    if (!slug) return null;
-    try {
-      const raw = sessionStorage.getItem(`${STRAIN_DETAIL_PREFETCH_KEY_PREFIX}${slug}`);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed !== 'object') return null;
-
-      const age = Date.now() - Number(parsed.cachedAt || 0);
-      if (!Number.isFinite(age) || age > STRAIN_DETAIL_PREFETCH_MAX_AGE_MS) {
-        sessionStorage.removeItem(`${STRAIN_DETAIL_PREFETCH_KEY_PREFIX}${slug}`);
-        return null;
-      }
-
-      const strain = parsed.strain;
-      if (!strain || String(strain.slug || '').toLowerCase() !== slug) return null;
-      return strain;
-    } catch (error) {
-      console.warn('Failed to read prefetched strain detail.', error);
-      return null;
-    }
-  }
-
-  function readCachedStrainBySlug(slug) {
-    if (!slug) return null;
-    try {
-      const raw = localStorage.getItem(STRAINS_CACHE_KEY);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-
-      if (Array.isArray(parsed)) {
-        localStorage.removeItem(STRAINS_CACHE_KEY);
-        return null;
-      }
-
-      const cachedAt = Number(parsed?.updatedAt || 0);
-      const ageMs = Date.now() - cachedAt;
-      const isFresh = Number.isFinite(cachedAt) && cachedAt > 0 && Number.isFinite(ageMs) && ageMs <= STRAINS_CACHE_MAX_AGE_MS;
-      if (!isFresh) {
-        localStorage.removeItem(STRAINS_CACHE_KEY);
-        return null;
-      }
-
-      const strains = Array.isArray(parsed?.strains) ? parsed.strains : [];
-      return strains.find((item) => String(item?.slug || '').toLowerCase() === slug) || null;
-    } catch (error) {
-      console.warn('Failed to read cached strains list.', error);
-      return null;
-    }
-  }
-
   function renderNotFound(message) {
     const error = document.getElementById('detail-error');
     const name = document.getElementById('strain-name');
@@ -505,11 +347,6 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const fallbackStrain = FALLBACK_STRAINS.find((item) => item.slug === slug);
-    const prefetchedStrain = readPrefetchedStrainDetail(slug);
-    const cachedStrain = readCachedStrainBySlug(slug);
-    const immediateStrain = prefetchedStrain || cachedStrain || fallbackStrain || null;
-    if (immediateStrain) renderStrain(immediateStrain);
     const supabase = getSupabaseClient();
 
     if (!supabase) {
@@ -518,20 +355,10 @@ document.addEventListener('DOMContentLoaded', () => {
           if (name) applyLiveShopName(name);
         })
         .catch((_error) => {
-          // Keep fallback branding when REST lookup is unavailable.
+          // Keep local branding when REST lookup is unavailable.
         });
 
-      if (immediateStrain) {
-        if (immediateStrain === cachedStrain || immediateStrain === prefetchedStrain) {
-          const error = document.getElementById('detail-error');
-          if (error) {
-            error.textContent = 'Showing cached profile while live sync is unavailable.';
-            error.classList.remove('hidden');
-          }
-        }
-      } else {
-        renderNotFound(`No strain found for slug "${slug}".`);
-      }
+      renderNotFound('Supabase is not configured. Could not load strain detail.');
       return;
     }
 
@@ -563,34 +390,10 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      if (prefetchedStrain || cachedStrain) {
-        const error = document.getElementById('detail-error');
-        if (error) {
-          error.textContent = 'Live profile unavailable. Showing cached details.';
-          error.classList.remove('hidden');
-        }
-        return;
-      }
-
-      if (fallbackStrain) {
-        renderStrain(fallbackStrain);
-        return;
-      }
-
       renderNotFound(`No published strain found for slug "${slug}".`);
     } catch (error) {
       console.error('Failed to load strain detail from Supabase.', error);
-      if (prefetchedStrain || cachedStrain) {
-        const detailError = document.getElementById('detail-error');
-        if (detailError) {
-          detailError.textContent = 'Showing cached profile while live sync is unavailable.';
-          detailError.classList.remove('hidden');
-        }
-      } else if (fallbackStrain) {
-        renderStrain(fallbackStrain);
-      } else {
-        renderNotFound('Could not load strain detail right now.');
-      }
+      renderNotFound('Could not load strain detail right now.');
     }
   }
 

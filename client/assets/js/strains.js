@@ -14,10 +14,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const defaultStrainImg = '/image/default.jpg';
   const PAGE_SIZE = 12;
-  const STRAINS_CACHE_KEY = 'lp_strains_cache_v1';
-  const STRAINS_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
   const STRAIN_DETAIL_PREFETCH_KEY_PREFIX = 'lp_strain_prefetch_v1:';
   const LIVE_SYNC_TIMEOUT_MS = 7000;
+  const STRAIN_IMAGE_FETCH_TIMEOUT_MS = 12000;
+  const MAX_PARALLEL_IMAGE_FETCHES = 2;
   const VALID_STRAIN_FILTERS = ['all', 'sativa', 'indica', 'hybrid'];
   const CARD_IMAGE_WIDTH = 640;
   const CARD_IMAGE_HEIGHT = 390;
@@ -25,19 +25,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const SHOP_NAME_CACHE_KEY = 'lp_shop_name_v1';
   const SHOP_NAME_PATTERNS = [/Let['’]s Phuket/g, /Lets Phuket/g];
   let brandTextNodes = null;
-
-  const FALLBACK_STRAINS = [
-    { slug: 'tropical-cherry', name: 'Tropical Cherry', strain_type: 'Hybrid', short_description: 'Cherry gelato with papaya diesel - sticky resin and a blissy, island glow.', terpenes: ['Limonene', 'Myrcene'], mood_aroma: 'Blissed - Heavy', image_url: 'image/default.jpg', image_alt: 'Tropical Cherry strain flower', sort_order: 1 },
-    { slug: 'subzero', name: 'Subzero', strain_type: 'Hybrid', short_description: 'Frosty gas with minty inhale and a clear, chilled headspace.', terpenes: ['Caryophyllene', 'Limonene'], mood_aroma: 'Icy - Focused', image_url: 'image/default.jpg', image_alt: 'Subzero strain flower', sort_order: 2 },
-    { slug: 'banana-daddy', name: 'Banana Daddy', strain_type: 'Indica', short_description: 'Ripe banana bread and grape candy with a mellow, grinny body feel.', terpenes: ['Myrcene', 'Linalool'], mood_aroma: 'Cozy - Euphoric', image_url: 'image/default.jpg', image_alt: 'Banana Daddy strain flower', sort_order: 3 },
-    { slug: 'blueberry-muffin', name: 'BlueBerry Muffin', strain_type: 'Hybrid', short_description: 'Warm blueberry muffin nose with a creamy finish and calming exhale.', terpenes: ['Myrcene', 'Pinene'], mood_aroma: 'Happy - Relaxed', image_url: 'image/default.jpg', image_alt: 'BlueBerry Muffin strain flower', sort_order: 4 },
-    { slug: 'pink-runtz', name: 'Pink Runtz', strain_type: 'Hybrid', short_description: 'Cotton candy and tropical sherbet with a mellow, floaty lift.', terpenes: ['Caryophyllene', 'Limonene'], mood_aroma: 'Euphoric - Social', image_url: 'image/default.jpg', image_alt: 'Pink Runtz strain flower', sort_order: 5 },
-    { slug: 'tea-time', name: 'Tea Time', strain_type: 'Hybrid', short_description: 'Earl grey, lemon zest, and a smooth calm that stays clear and chatty.', terpenes: ['Linalool', 'Caryophyllene'], mood_aroma: 'Calm - Focused', image_url: 'image/Teatime.jpg', image_alt: 'Tea Time strain flower', sort_order: 6 },
-    { slug: 'lgbtq', name: 'LGBTQ', strain_type: 'Sativa', short_description: 'Rainbow sherbet nose with passionfruit pop and an upbeat social lift.', terpenes: ['Limonene', 'Terpinolene'], mood_aroma: 'Uplifted - Creative', image_url: 'image/LGBTQ.jpg', image_alt: 'LGBTQ strain flower', sort_order: 7 },
-    { slug: 'zupa', name: 'ZuPa', strain_type: 'Hybrid', short_description: 'Tropical candy with creamy gas and a floaty, euphoric body melt.', terpenes: ['Myrcene', 'Caryophyllene'], mood_aroma: 'Relaxed - Euphoric', image_url: 'image/Zupa.jpg', image_alt: 'ZuPa strain flower', sort_order: 8 },
-    { slug: 'neon-icon', name: 'Neon Icon', strain_type: 'Sativa', short_description: 'Electric citrus and guava ice that keeps conversations bright and focused.', terpenes: ['Ocimene', 'Limonene'], mood_aroma: 'Social - Focused', image_url: 'image/Neonicon.jpg', image_alt: 'Neon Icon strain flower', sort_order: 9 },
-    { slug: 'super-boof', name: 'Super Boof', strain_type: 'Hybrid', short_description: 'Tangerine peel with earthy cookie, floaty chatter without the couch-lock.', terpenes: ['Caryophyllene', 'Linalool'], mood_aroma: 'Talkative - Relaxed', image_url: 'image/default.jpg', image_alt: 'Super Boof strain flower', sort_order: 10 }
-  ];
 
   const LEAF_ICON = '<svg viewBox="0 0 64 64"><path d="M32 6c4 9 6 13 10 16 6 4 11 2 11 2s-4 6-10 8c-3 1-8 1-11-1 1 7 3 14 2 23l-3-8-3 8c-1-9 1-16 2-23-3 2-8 2-11 1-6-2-10-8-10-8s5 2 11-2c4-3 6-7 10-16z" /></svg>';
 
@@ -162,7 +149,9 @@ document.addEventListener('DOMContentLoaded', () => {
   let visibleCount = 0;
   let activeFilter = 'all';
   let searchQuery = '';
-  let dataSource = 'fallback';
+  let imageHydrationSupabase = null;
+  const strainImageCache = new Map();
+  const strainImageInFlight = new Map();
   const prefetchedDetailDocuments = new Set();
   const prefetchedDetailSlugs = new Set();
   const supportsLinkPrefetch = (() => {
@@ -386,44 +375,127 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  function readCachedStrains() {
+  async function fetchStrainImageBySlugWithTimeout(supabase, slug, timeoutMs = STRAIN_IMAGE_FETCH_TIMEOUT_MS) {
+    const controller = new AbortController();
+    let timeoutId = 0;
+
+    const timeoutPromise = new Promise((_, reject) => {
+      timeoutId = window.setTimeout(() => {
+        controller.abort();
+        reject(createTimeoutError(timeoutMs));
+      }, timeoutMs);
+    });
+
     try {
-      const raw = localStorage.getItem(STRAINS_CACHE_KEY);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
+      let query = supabase
+        .from('strains')
+        .select('slug,image_url,image_alt')
+        .eq('slug', slug)
+        .eq('is_published', true)
+        .maybeSingle();
 
-      if (Array.isArray(parsed)) {
-        // Legacy payload format had no timestamp and could remain stale forever.
-        localStorage.removeItem(STRAINS_CACHE_KEY);
-        return [];
+      if (typeof query.abortSignal === 'function') {
+        query = query.abortSignal(controller.signal);
       }
 
-      const cachedAt = Number(parsed?.updatedAt || 0);
-      const ageMs = Date.now() - cachedAt;
-      const isFresh = Number.isFinite(cachedAt) && cachedAt > 0 && Number.isFinite(ageMs) && ageMs <= STRAINS_CACHE_MAX_AGE_MS;
-      if (!isFresh) {
-        localStorage.removeItem(STRAINS_CACHE_KEY);
-        return [];
-      }
-
-      if (Array.isArray(parsed?.strains)) return parsed.strains;
-      return [];
+      const result = await Promise.race([query, timeoutPromise]);
+      if (result?.error) throw result.error;
+      return result?.data || null;
     } catch (error) {
-      console.warn('Failed to read strains cache.', error);
-      return [];
+      if (controller.signal.aborted && error?.name !== 'TimeoutError') {
+        throw createTimeoutError(timeoutMs);
+      }
+      throw error;
+    } finally {
+      window.clearTimeout(timeoutId);
     }
   }
 
-  function writeCachedStrains(strains) {
-    if (!Array.isArray(strains) || strains.length === 0) return;
-    try {
-      localStorage.setItem(STRAINS_CACHE_KEY, JSON.stringify({
-        updatedAt: Date.now(),
-        strains
-      }));
-    } catch (error) {
-      console.warn('Failed to write strains cache.', error);
+  function cacheStrainImage(slug, payload) {
+    if (!slug || !payload?.image_url) return;
+    const normalizedSlug = String(slug).toLowerCase();
+    const target = strainBySlug.get(normalizedSlug);
+    if (!target) return;
+    target.image_url = payload.image_url;
+    if (payload.image_alt) target.image_alt = payload.image_alt;
+  }
+
+  async function getStrainImageBySlug(supabase, slug) {
+    const normalizedSlug = String(slug || '').trim().toLowerCase();
+    if (!normalizedSlug) return null;
+
+    if (strainImageCache.has(normalizedSlug)) {
+      return strainImageCache.get(normalizedSlug);
     }
+
+    if (strainImageInFlight.has(normalizedSlug)) {
+      return strainImageInFlight.get(normalizedSlug);
+    }
+
+    const request = (async () => {
+      try {
+        const data = await fetchStrainImageBySlugWithTimeout(supabase, normalizedSlug, STRAIN_IMAGE_FETCH_TIMEOUT_MS);
+        const imageUrl = String(data?.image_url || '').trim();
+        const imageAlt = String(data?.image_alt || '').trim();
+        if (!imageUrl) return null;
+
+        const payload = { image_url: imageUrl, image_alt: imageAlt || null };
+        strainImageCache.set(normalizedSlug, payload);
+        cacheStrainImage(normalizedSlug, payload);
+        return payload;
+      } catch (error) {
+        console.warn(`Failed to hydrate image for slug "${normalizedSlug}".`, error);
+        return null;
+      } finally {
+        strainImageInFlight.delete(normalizedSlug);
+      }
+    })();
+
+    strainImageInFlight.set(normalizedSlug, request);
+    return request;
+  }
+
+  async function hydrateRenderedCardImages() {
+    const supabase = imageHydrationSupabase || getSupabaseClient();
+    if (!supabase || !grid) return;
+
+    const imageNodes = Array.from(grid.querySelectorAll('.strain-media img[data-strain-slug]'))
+      .filter((img) => img.dataset.imageHydrated !== 'true');
+    if (!imageNodes.length) return;
+
+    const nodesBySlug = new Map();
+    imageNodes.forEach((img) => {
+      const slug = String(img.dataset.strainSlug || '').trim().toLowerCase();
+      if (!slug) return;
+      if (!nodesBySlug.has(slug)) nodesBySlug.set(slug, []);
+      nodesBySlug.get(slug).push(img);
+    });
+
+    const slugs = Array.from(nodesBySlug.keys());
+    if (!slugs.length) return;
+
+    let cursor = 0;
+    const workerCount = Math.min(MAX_PARALLEL_IMAGE_FETCHES, slugs.length);
+
+    const workers = Array.from({ length: workerCount }, async () => {
+      while (cursor < slugs.length) {
+        const slug = slugs[cursor];
+        cursor += 1;
+
+        const payload = await getStrainImageBySlug(supabase, slug);
+        const targets = nodesBySlug.get(slug) || [];
+
+        targets.forEach((img) => {
+          if (payload?.image_url) {
+            img.src = resolveImageUrl(payload.image_url);
+            if (payload.image_alt) img.alt = payload.image_alt;
+          }
+          img.dataset.imageHydrated = 'true';
+        });
+      }
+    });
+
+    await Promise.all(workers);
   }
 
   function writePrefetchedStrainDetail(strain) {
@@ -477,38 +549,31 @@ document.addEventListener('DOMContentLoaded', () => {
     status.classList.toggle('hidden', !message);
   }
 
-  function getCurrentCatalogLabel() {
-    return dataSource === 'cache' ? 'last synced catalog' : 'local catalog';
-  }
-
-  function setRefreshingStatus() {
-    if (dataSource === 'cache') {
-      setStatus('Showing last synced catalog. Refreshing live data...');
-    } else {
-      setStatus('Refreshing live catalog...');
-    }
+  function setLoadingStatus() {
+    setStatus('Loading strains from database...');
   }
 
   function setLiveUnavailableStatus() {
-    const sourceLabel = getCurrentCatalogLabel();
     if (navigator.onLine === false) {
-      setStatus(`Offline mode. Showing ${sourceLabel}.`);
+      setStatus('You are offline. Could not load strains from database.');
     } else {
-      setStatus(`Live sync unavailable. Showing ${sourceLabel}.`);
+      setStatus('Could not load live strains right now.');
     }
   }
 
   function setTimeoutStatus() {
-    const sourceLabel = getCurrentCatalogLabel();
-    setStatus(`Live sync timed out. Showing ${sourceLabel}.`);
+    setStatus('Live sync timed out while loading strains.');
   }
 
   function setNoUpdatesStatus() {
-    if (dataSource === 'cache') {
-      setStatus('No published live updates found. Showing last synced catalog.');
-    } else {
-      setStatus('No published live strains found. Showing local catalog.');
-    }
+    setStatus('No published live strains found yet.');
+  }
+
+  function setLoadingView() {
+    if (grid) grid.innerHTML = '';
+    if (loadMoreWrap) loadMoreWrap.classList.add('hidden');
+    if (heading) heading.textContent = 'Loading strains in Thailand...';
+    setLoadingStatus();
   }
 
   function createTimeoutError(timeoutMs) {
@@ -531,7 +596,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       let query = supabase
         .from('strains')
-        .select('slug,name,strain_type,short_description,terpenes,mood_aroma,image_url,image_alt,sort_order')
+        .select('slug,name,strain_type,short_description,terpenes,mood_aroma,sort_order')
         .eq('is_published', true)
         .order('sort_order', { ascending: true });
 
@@ -560,6 +625,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const image = getCardImageSources(strain.image_url || defaultStrainImg);
       const imgAlt = escapeHtml(strain.image_alt || `${strain.name} strain flower`);
       const imgSizes = '(max-width: 640px) calc(100vw - 48px), (max-width: 1100px) calc(50vw - 40px), 280px';
+      const hasImage = Boolean(String(strain.image_url || '').trim());
 
       return `
         <a class="strain-card-link" href="${detailHref}">
@@ -568,7 +634,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <picture>
                 ${image.avifSrcset ? `<source type="image/avif" srcset="${escapeHtml(image.avifSrcset)}" sizes="${imgSizes}">` : ''}
                 ${image.webpSrcset ? `<source type="image/webp" srcset="${escapeHtml(image.webpSrcset)}" sizes="${imgSizes}">` : ''}
-                <img src="${escapeHtml(image.src)}" ${image.srcset ? `srcset="${escapeHtml(image.srcset)}"` : ''} sizes="${imgSizes}" alt="${imgAlt}" loading="lazy" decoding="async" width="${CARD_IMAGE_WIDTH}" height="${CARD_IMAGE_HEIGHT}">
+                <img src="${escapeHtml(image.src)}" ${image.srcset ? `srcset="${escapeHtml(image.srcset)}"` : ''} sizes="${imgSizes}" alt="${imgAlt}" loading="lazy" decoding="async" width="${CARD_IMAGE_WIDTH}" height="${CARD_IMAGE_HEIGHT}" data-strain-slug="${escapeHtml(slug)}" data-image-hydrated="${hasImage ? 'true' : 'false'}">
               </picture>
             </div>
             <div class="strain-top">
@@ -590,6 +656,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (append) grid.insertAdjacentHTML('beforeend', html);
     else grid.innerHTML = html;
     bindDetailPrefetchHandlers();
+    void hydrateRenderedCardImages();
   }
 
   function bindDetailPrefetchHandlers() {
@@ -633,10 +700,9 @@ document.addEventListener('DOMContentLoaded', () => {
     updateHeaderAndControls();
   }
 
-  function setStrains(strains, source = 'live') {
+  function setStrains(strains) {
     allStrains = Array.isArray(strains) ? strains : [];
     strainBySlug = new Map(allStrains.map((item) => [String(item?.slug || '').toLowerCase(), item]));
-    dataSource = source;
     visibleCount = 0;
     if (grid) grid.innerHTML = '';
     loadMore();
@@ -646,16 +712,19 @@ document.addEventListener('DOMContentLoaded', () => {
   async function loadAllStrainsInBackground() {
     const supabase = getSupabaseClient();
     if (!supabase) {
+      imageHydrationSupabase = null;
       fetchShopNameViaRest()
         .then((name) => {
           if (name) applyLiveShopName(name);
         })
         .catch((_error) => {
-          // Keep fallback branding when REST lookup is unavailable.
+          // Keep local branding when REST lookup is unavailable.
         });
+      setStrains([]);
       setLiveUnavailableStatus();
       return;
     }
+    imageHydrationSupabase = supabase;
 
     (async () => {
       try {
@@ -677,7 +746,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (restName) applyLiveShopName(restName);
     })();
 
-    setRefreshingStatus();
+    setLoadingStatus();
 
     try {
       const { data, error } = await fetchPublishedStrainsWithTimeout(supabase, LIVE_SYNC_TIMEOUT_MS);
@@ -685,14 +754,15 @@ document.addEventListener('DOMContentLoaded', () => {
       if (error) throw error;
 
       if (Array.isArray(data) && data.length > 0) {
-        setStrains(data, 'live');
-        writeCachedStrains(data);
+        setStrains(data);
         setStatus('');
       } else {
+        setStrains([]);
         setNoUpdatesStatus();
       }
     } catch (error) {
-      console.error('Failed to load strains. Falling back to local content.', error);
+      console.error('Failed to load strains from Supabase.', error);
+      setStrains([]);
       if (error?.name === 'TimeoutError') {
         setTimeoutStatus();
       } else {
@@ -729,12 +799,6 @@ document.addEventListener('DOMContentLoaded', () => {
     applyBrowseState({ syncUrl: false });
   });
 
-  const cachedStrains = readCachedStrains();
-  if (cachedStrains.length > 0) {
-    setStrains(cachedStrains, 'cache');
-    setRefreshingStatus();
-  } else {
-    setStrains(FALLBACK_STRAINS, 'fallback');
-  }
+  setLoadingView();
   loadAllStrainsInBackground();
 });

@@ -8,6 +8,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const defaultStrainImg = '/image/default.jpg';
   const HOMEPAGE_STRAIN_LIMIT = 10;
+  const STRAIN_IMAGE_FETCH_TIMEOUT_MS = 12000;
+  const MAX_HOMEPAGE_IMAGE_FETCHES = 2;
   const DEFAULT_SHOP_NAME = "Let's Phuket";
   const SHOP_NAME_CACHE_KEY = 'lp_shop_name_v1';
   const SHOP_NAME_PATTERNS = [/Let['’]s Phuket/g, /Lets Phuket/g];
@@ -15,140 +17,18 @@ document.addEventListener('DOMContentLoaded', () => {
   let activeHomepageFilter = 'all';
   let activeShopName = DEFAULT_SHOP_NAME;
   let brandTextNodes = null;
+  const strainImageCache = new Map();
+  const strainImageInFlight = new Map();
 
-  const FALLBACK_DATA = {
-    strains: [
-      {
-        slug: 'tropical-cherry',
-        name: 'Tropical Cherry',
-        strain_type: 'Hybrid',
-        short_description: 'Cherry gelato with papaya diesel - sticky resin and a blissy, island glow.',
-        terpenes: ['Limonene', 'Myrcene'],
-        mood_aroma: 'Blissed - Heavy',
-        image_url: 'image/default.jpg',
-        image_alt: 'Tropical Cherry strain flower',
-        sort_order: 1,
-        is_featured: false
-      },
-      {
-        slug: 'subzero',
-        name: 'Subzero',
-        strain_type: 'Hybrid',
-        short_description: 'Frosty gas with minty inhale and a clear, chilled headspace.',
-        terpenes: ['Caryophyllene', 'Limonene'],
-        mood_aroma: 'Icy - Focused',
-        image_url: 'image/default.jpg',
-        image_alt: 'Subzero strain flower',
-        sort_order: 2,
-        is_featured: false
-      },
-      {
-        slug: 'banana-daddy',
-        name: 'Banana Daddy',
-        strain_type: 'Indica',
-        short_description: 'Ripe banana bread and grape candy with a mellow, grinny body feel.',
-        terpenes: ['Myrcene', 'Linalool'],
-        mood_aroma: 'Cozy - Euphoric',
-        image_url: 'image/default.jpg',
-        image_alt: 'Banana Daddy strain flower',
-        sort_order: 3,
-        is_featured: false
-      },
-      {
-        slug: 'blueberry-muffin',
-        name: 'BlueBerry Muffin',
-        strain_type: 'Hybrid',
-        short_description: 'Warm blueberry muffin nose with a creamy finish and calming exhale.',
-        terpenes: ['Myrcene', 'Pinene'],
-        mood_aroma: 'Happy - Relaxed',
-        image_url: 'image/default.jpg',
-        image_alt: 'BlueBerry Muffin strain flower',
-        sort_order: 4,
-        is_featured: false
-      },
-      {
-        slug: 'pink-runtz',
-        name: 'Pink Runtz',
-        strain_type: 'Hybrid',
-        short_description: 'Cotton candy and tropical sherbet with a mellow, floaty lift.',
-        terpenes: ['Caryophyllene', 'Limonene'],
-        mood_aroma: 'Euphoric - Social',
-        image_url: 'image/default.jpg',
-        image_alt: 'Pink Runtz strain flower',
-        sort_order: 5,
-        is_featured: false
-      },
-      {
-        slug: 'tea-time',
-        name: 'Tea Time',
-        strain_type: 'Hybrid',
-        short_description: 'Earl grey, lemon zest, and a smooth calm that stays clear and chatty.',
-        terpenes: ['Linalool', 'Caryophyllene'],
-        mood_aroma: 'Calm - Focused',
-        image_url: 'image/Teatime.jpg',
-        image_alt: 'Tea Time strain flower',
-        sort_order: 6,
-        is_featured: true
-      },
-      {
-        slug: 'lgbtq',
-        name: 'LGBTQ',
-        strain_type: 'Sativa',
-        short_description: 'Rainbow sherbet nose with passionfruit pop and an upbeat social lift.',
-        terpenes: ['Limonene', 'Terpinolene'],
-        mood_aroma: 'Uplifted - Creative',
-        image_url: 'image/LGBTQ.jpg',
-        image_alt: 'LGBTQ strain flower',
-        sort_order: 7,
-        is_featured: false
-      },
-      {
-        slug: 'zupa',
-        name: 'ZuPa',
-        strain_type: 'Hybrid',
-        short_description: 'Tropical candy with creamy gas and a floaty, euphoric body melt.',
-        terpenes: ['Myrcene', 'Caryophyllene'],
-        mood_aroma: 'Relaxed - Euphoric',
-        image_url: 'image/Zupa.jpg',
-        image_alt: 'ZuPa strain flower',
-        sort_order: 8,
-        is_featured: false
-      },
-      {
-        slug: 'neon-icon',
-        name: 'Neon Icon',
-        strain_type: 'Sativa',
-        short_description: 'Electric citrus and guava ice that keeps conversations bright and focused.',
-        terpenes: ['Ocimene', 'Limonene'],
-        mood_aroma: 'Social - Focused',
-        image_url: 'image/Neonicon.jpg',
-        image_alt: 'Neon Icon strain flower',
-        sort_order: 9,
-        is_featured: false
-      },
-      {
-        slug: 'super-boof',
-        name: 'Super Boof',
-        strain_type: 'Hybrid',
-        short_description: 'Tangerine peel with earthy cookie, floaty chatter without the couch-lock.',
-        terpenes: ['Caryophyllene', 'Linalool'],
-        mood_aroma: 'Talkative - Relaxed',
-        image_url: 'image/default.jpg',
-        image_alt: 'Super Boof strain flower',
-        sort_order: 10,
-        is_featured: false
-      }
-    ],
-    shop: {
-      name: DEFAULT_SHOP_NAME,
-      visit_lede: 'Drop by our beach-level lounge between Patong and Kamala. Ask for the terp flight and we\'ll line up glass so you can taste the island spectrum.',
-      address: '187, 36 Phangnga Rd, Talat Yai, Amphoe Muang, Phuket 83000',
-      hours_text: 'Daily 10:00 AM - 12:00 PM',
-      whatsapp_url: 'https://wa.me/66628590096',
-      map_embed_url: 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d7904.215842592954!2d98.39339171929876!3d7.883776347126515!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x305033006d463199%3A0x49f34f4c561f0d75!2sHotel%20California!5e0!3m2!1sen!2sth!4v1765009064854!5m2!1sen!2sth',
-      map_note: '2 min walk from the sand - look for the neon leaf above the door.',
-      visit_note: 'Visit our physical location. No online sales or delivery are offered through this website.'
-    }
+  const FALLBACK_SHOP_PROFILE = {
+    name: DEFAULT_SHOP_NAME,
+    visit_lede: 'Drop by our beach-level lounge between Patong and Kamala. Ask for the terp flight and we\'ll line up glass so you can taste the island spectrum.',
+    address: '187, 36 Phangnga Rd, Talat Yai, Amphoe Muang, Phuket 83000',
+    hours_text: 'Daily 10:00 AM - 12:00 PM',
+    whatsapp_url: 'https://wa.me/66628590096',
+    map_embed_url: 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d7904.215842592954!2d98.39339171929876!3d7.883776347126515!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x305033006d463199%3A0x49f34f4c561f0d75!2sHotel%20California!5e0!3m2!1sen!2sth!4v1765009064854!5m2!1sen!2sth',
+    map_note: '2 min walk from the sand - look for the neon leaf above the door.',
+    visit_note: 'Visit our physical location. No online sales or delivery are offered through this website.'
   };
 
   const LEAF_ICON = '<svg viewBox="0 0 64 64"><path d="M32 6c4 9 6 13 10 16 6 4 11 2 11 2s-4 6-10 8c-3 1-8 1-11-1 1 7 3 14 2 23l-3-8-3 8c-1-9 1-16 2-23-3 2-8 2-11 1-6-2-10-8-10-8s5 2 11-2c4-3 6-7 10-16z" /></svg>';
@@ -385,6 +265,155 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  function createTimeoutError(timeoutMs) {
+    const error = new Error(`Image fetch timed out after ${timeoutMs}ms`);
+    error.name = 'TimeoutError';
+    return error;
+  }
+
+  async function fetchStrainImageBySlugWithTimeout(supabase, slug, timeoutMs = STRAIN_IMAGE_FETCH_TIMEOUT_MS) {
+    const controller = new AbortController();
+    let timeoutId = 0;
+
+    const timeoutPromise = new Promise((_, reject) => {
+      timeoutId = window.setTimeout(() => {
+        controller.abort();
+        reject(createTimeoutError(timeoutMs));
+      }, timeoutMs);
+    });
+
+    try {
+      let query = supabase
+        .from('strains')
+        .select('slug,image_url,image_alt')
+        .eq('slug', slug)
+        .eq('is_published', true)
+        .maybeSingle();
+
+      if (typeof query.abortSignal === 'function') {
+        query = query.abortSignal(controller.signal);
+      }
+
+      const result = await Promise.race([query, timeoutPromise]);
+      if (result?.error) throw result.error;
+      return result?.data || null;
+    } catch (error) {
+      if (controller.signal.aborted && error?.name !== 'TimeoutError') {
+        throw createTimeoutError(timeoutMs);
+      }
+      throw error;
+    } finally {
+      window.clearTimeout(timeoutId);
+    }
+  }
+
+  function cacheHomepageStrainImage(slug, payload) {
+    if (!slug || !payload?.image_url) return;
+    const normalizedSlug = String(slug).toLowerCase();
+    const target = homepageAllStrains.find((item) => String(item?.slug || '').toLowerCase() === normalizedSlug);
+    if (!target) return;
+    target.image_url = payload.image_url;
+    if (payload.image_alt) target.image_alt = payload.image_alt;
+  }
+
+  async function getStrainImageBySlug(supabase, slug) {
+    const normalizedSlug = String(slug || '').trim().toLowerCase();
+    if (!normalizedSlug) return null;
+
+    if (strainImageCache.has(normalizedSlug)) {
+      return strainImageCache.get(normalizedSlug);
+    }
+
+    if (strainImageInFlight.has(normalizedSlug)) {
+      return strainImageInFlight.get(normalizedSlug);
+    }
+
+    const request = (async () => {
+      try {
+        const data = await fetchStrainImageBySlugWithTimeout(supabase, normalizedSlug, STRAIN_IMAGE_FETCH_TIMEOUT_MS);
+        const imageUrl = String(data?.image_url || '').trim();
+        const imageAlt = String(data?.image_alt || '').trim();
+        if (!imageUrl) return null;
+
+        const payload = { image_url: imageUrl, image_alt: imageAlt || null };
+        strainImageCache.set(normalizedSlug, payload);
+        cacheHomepageStrainImage(normalizedSlug, payload);
+        return payload;
+      } catch (error) {
+        console.warn(`Failed to hydrate image for slug "${normalizedSlug}".`, error);
+        return null;
+      } finally {
+        strainImageInFlight.delete(normalizedSlug);
+      }
+    })();
+
+    strainImageInFlight.set(normalizedSlug, request);
+    return request;
+  }
+
+  async function hydrateHomepageCardImages() {
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+
+    const imageNodes = Array.from(document.querySelectorAll('#strain-grid .strain-media img[data-strain-slug]'))
+      .filter((img) => img.dataset.imageHydrated !== 'true');
+    if (!imageNodes.length) return;
+
+    const nodesBySlug = new Map();
+    imageNodes.forEach((img) => {
+      const slug = String(img.dataset.strainSlug || '').trim().toLowerCase();
+      if (!slug) return;
+      if (!nodesBySlug.has(slug)) nodesBySlug.set(slug, []);
+      nodesBySlug.get(slug).push(img);
+    });
+
+    const slugs = Array.from(nodesBySlug.keys());
+    if (!slugs.length) return;
+
+    let cursor = 0;
+    const workerCount = Math.min(MAX_HOMEPAGE_IMAGE_FETCHES, slugs.length);
+
+    const workers = Array.from({ length: workerCount }, async () => {
+      while (cursor < slugs.length) {
+        const slug = slugs[cursor];
+        cursor += 1;
+
+        const payload = await getStrainImageBySlug(supabase, slug);
+        const targets = nodesBySlug.get(slug) || [];
+
+        targets.forEach((img) => {
+          if (payload?.image_url) {
+            img.src = resolveImageUrl(payload.image_url);
+            if (payload.image_alt) img.alt = payload.image_alt;
+          }
+          img.dataset.imageHydrated = 'true';
+          img.dataset.fallbackApplied = 'false';
+        });
+      }
+    });
+
+    await Promise.all(workers);
+    applyImageFallbacks();
+  }
+
+  function setHomepageLoadingState() {
+    const strainGrid = document.getElementById('strain-grid');
+    const heading = document.getElementById('strains-heading');
+    const seeMoreWrap = document.getElementById('strains-see-more-wrap');
+
+    if (strainGrid) strainGrid.innerHTML = '';
+    if (heading) heading.textContent = 'Loading strains in Thailand...';
+    if (seeMoreWrap) seeMoreWrap.classList.add('hidden');
+  }
+
+  function setHomepageUnavailableState(message) {
+    const heading = document.getElementById('strains-heading');
+    const seeMoreWrap = document.getElementById('strains-see-more-wrap');
+
+    if (heading) heading.textContent = String(message || 'Could not load strains right now.');
+    if (seeMoreWrap) seeMoreWrap.classList.add('hidden');
+  }
+
   function renderStrains(strains) {
     const strainGrid = document.getElementById('strain-grid');
     if (!strainGrid) return;
@@ -394,11 +423,12 @@ document.addEventListener('DOMContentLoaded', () => {
       const terpenes = formatList(strain.terpenes);
       const slug = String(strain.slug || '');
       const detailHref = `client/pages/strain.html?slug=${encodeURIComponent(slug)}`;
+      const hasImage = Boolean(String(strain.image_url || '').trim());
       return `
         <a class="strain-card-link" href="${detailHref}">
           <article class="strain-card">
             <div class="strain-media">
-              <img src="${escapeHtml(resolveImageUrl(strain.image_url || defaultStrainImg))}" alt="${escapeHtml(strain.image_alt || `${strain.name} strain flower`)}" loading="lazy">
+              <img src="${escapeHtml(resolveImageUrl(strain.image_url || defaultStrainImg))}" alt="${escapeHtml(strain.image_alt || `${strain.name} strain flower`)}" loading="lazy" data-strain-slug="${escapeHtml(slug)}" data-image-hydrated="${hasImage ? 'true' : 'false'}">
             </div>
             <div class="strain-top">
               <div class="leaf-icon" aria-hidden="true">${LEAF_ICON}</div>
@@ -440,6 +470,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (seeMoreWrap) {
       seeMoreWrap.classList.toggle('hidden', filtered.length <= HOMEPAGE_STRAIN_LIMIT);
     }
+
+    applyImageFallbacks();
+    void hydrateHomepageCardImages();
   }
 
   function applyHomepageStrains(strains) {
@@ -449,7 +482,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function applyFeaturedStrain(strains) {
     const list = Array.isArray(strains) ? strains : [];
-    if (!list.length) return;
+    if (!list.length) {
+      setFeaturedEmptyState();
+      return;
+    }
 
     const featuredByFlag = list.find((strain) => Boolean(strain.is_featured));
     const toTimestamp = (value) => {
@@ -482,6 +518,38 @@ document.addEventListener('DOMContentLoaded', () => {
     if (cardDescription) cardDescription.textContent = featured.short_description || '';
     if (cardTerpenes) cardTerpenes.textContent = terpenes;
     if (cardMood) cardMood.textContent = String(featured.mood_aroma || '').replaceAll('-', '•');
+  }
+
+  function setFeaturedLoadingState() {
+    const badgeName = document.getElementById('featured-badge-name');
+    const badgeTerpenes = document.getElementById('featured-badge-terpenes');
+    const cardName = document.getElementById('featured-card-name');
+    const cardDescription = document.getElementById('featured-card-description');
+    const cardTerpenes = document.getElementById('featured-card-terpenes');
+    const cardMood = document.getElementById('featured-card-mood');
+
+    if (badgeName) badgeName.textContent = 'Loading...';
+    if (badgeTerpenes) badgeTerpenes.textContent = 'Loading...';
+    if (cardName) cardName.textContent = 'Loading...';
+    if (cardDescription) cardDescription.textContent = 'Loading featured strain from database...';
+    if (cardTerpenes) cardTerpenes.textContent = 'Loading...';
+    if (cardMood) cardMood.textContent = 'Loading...';
+  }
+
+  function setFeaturedEmptyState() {
+    const badgeName = document.getElementById('featured-badge-name');
+    const badgeTerpenes = document.getElementById('featured-badge-terpenes');
+    const cardName = document.getElementById('featured-card-name');
+    const cardDescription = document.getElementById('featured-card-description');
+    const cardTerpenes = document.getElementById('featured-card-terpenes');
+    const cardMood = document.getElementById('featured-card-mood');
+
+    if (badgeName) badgeName.textContent = 'No featured strain';
+    if (badgeTerpenes) badgeTerpenes.textContent = 'Add published strains in Supabase';
+    if (cardName) cardName.textContent = 'No featured strain';
+    if (cardDescription) cardDescription.textContent = 'No published strains are available yet.';
+    if (cardTerpenes) cardTerpenes.textContent = '-';
+    if (cardMood) cardMood.textContent = '-';
   }
 
   function safeMapUrl(value) {
@@ -568,6 +636,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function loadContent() {
+    setHomepageLoadingState();
+    setFeaturedLoadingState();
+
     const supabase = getSupabaseClient();
 
     if (!supabase) {
@@ -576,12 +647,13 @@ document.addEventListener('DOMContentLoaded', () => {
           if (name) applyLiveShopName(name);
         })
         .catch((_error) => {
-          // Keep fallback branding when REST lookup is unavailable.
+          // Keep local branding when REST lookup is unavailable.
         });
 
-      applyHomepageStrains(FALLBACK_DATA.strains);
-      applyShopProfile(FALLBACK_DATA.shop);
-      applyFeaturedStrain(FALLBACK_DATA.strains);
+      applyHomepageStrains([]);
+      applyShopProfile(FALLBACK_SHOP_PROFILE);
+      setHomepageUnavailableState('Supabase is not configured. Strains are unavailable.');
+      setFeaturedEmptyState();
       applyImageFallbacks();
       return;
     }
@@ -590,7 +662,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const [strainsResult, shopResult] = await Promise.allSettled([
         supabase
           .from('strains')
-          .select('slug,name,strain_type,short_description,terpenes,mood_aroma,image_url,image_alt,sort_order,is_featured,updated_at')
+          .select('slug,name,strain_type,short_description,terpenes,mood_aroma,sort_order,is_featured,updated_at')
           .eq('is_published', true)
           .order('sort_order', { ascending: true }),
         supabase
@@ -605,11 +677,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const strains = strainsRes && !strainsRes.error && Array.isArray(strainsRes.data) && strainsRes.data.length > 0
         ? strainsRes.data
-        : FALLBACK_DATA.strains;
+        : [];
 
       const shop = shopRes && !shopRes.error && shopRes.data
         ? shopRes.data
-        : { ...FALLBACK_DATA.shop };
+        : { ...FALLBACK_SHOP_PROFILE };
 
       if (!shopRes || shopRes.error || !shopRes.data) {
         const restName = await fetchShopNameViaRest().catch(() => null);
@@ -619,12 +691,16 @@ document.addEventListener('DOMContentLoaded', () => {
       applyHomepageStrains(strains);
       applyShopProfile(shop);
       applyFeaturedStrain(strains);
+      if (!strains.length) {
+        setHomepageUnavailableState('No published strains found in database yet.');
+      }
       applyImageFallbacks();
     } catch (error) {
-      console.error('Failed to load Supabase data. Falling back to local content.', error);
-      applyHomepageStrains(FALLBACK_DATA.strains);
-      applyShopProfile(FALLBACK_DATA.shop);
-      applyFeaturedStrain(FALLBACK_DATA.strains);
+      console.error('Failed to load Supabase data.', error);
+      applyHomepageStrains([]);
+      applyShopProfile(FALLBACK_SHOP_PROFILE);
+      setHomepageUnavailableState('Could not load strains right now.');
+      setFeaturedEmptyState();
       applyImageFallbacks();
     }
   }

@@ -45,3 +45,9 @@ Users listed in `admin_users` can write to `strains`, `merch_items`, and `shop_p
 ## 5) Incremental migrations (existing projects)
 If your project was created before bilingual strain descriptions, paste and run the SQL from:
 - [`migrations/20260412_add_strain_description_i18n.sql`](./migrations/20260412_add_strain_description_i18n.sql)
+
+If your project was created before admin image uploads to Supabase Storage, also run:
+- [`migrations/20260412_add_strain_image_storage_bucket.sql`](./migrations/20260412_add_strain_image_storage_bucket.sql)
+
+To remove the original demo strains from older databases, run:
+- [`migrations/20260413_delete_old_seed_strains.sql`](./migrations/20260413_delete_old_seed_strains.sql)
