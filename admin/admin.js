@@ -58,7 +58,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const inputSlug = document.getElementById('slug');
   const inputStrainType = document.getElementById('strain_type');
   const inputSortOrder = document.getElementById('sort_order');
-  const inputDescription = document.getElementById('short_description');
+  const inputDescriptionEn = document.getElementById('short_description');
+  const inputDescriptionMm = document.getElementById('description_mm');
   const inputMoodAroma = document.getElementById('mood_aroma');
   const inputTerpenes = document.getElementById('terpenes');
   const inputImageUrl = document.getElementById('image_url');
@@ -119,6 +120,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const VIEW_NAMES = new Set(['overview', 'strains', 'shop']);
   const MAX_IMAGE_FILE_SIZE_BYTES = 5 * 1024 * 1024;
   const SHOP_NAME_CACHE_KEY = 'lp_shop_name_v1';
+  const STRAINS_SELECT_WITH_I18N = 'id,slug,name,strain_type,short_description,description_en,description_mm,terpenes,mood_aroma,image_url,image_alt,is_featured,is_published,sort_order,updated_at';
+  const STRAINS_SELECT_LEGACY = 'id,slug,name,strain_type,short_description,terpenes,mood_aroma,image_url,image_alt,is_featured,is_published,sort_order,updated_at';
 
   function formatSyncTime(date = new Date()) {
     return date.toLocaleString([], {
@@ -303,13 +306,18 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function getCurrentFormSnapshot() {
+    const descriptionEn = inputDescriptionEn.value.trim();
+    const descriptionMm = inputDescriptionMm.value.trim();
+
     return JSON.stringify({
       id: inputId.value.trim(),
       name: inputName.value.trim(),
       slug: inputSlug.value.trim(),
       strain_type: inputStrainType.value,
       sort_order: inputSortOrder.value.trim(),
-      short_description: inputDescription.value.trim(),
+      short_description: descriptionEn,
+      description_en: descriptionEn,
+      description_mm: descriptionMm,
       mood_aroma: inputMoodAroma.value.trim(),
       terpenes: inputTerpenes.value.trim(),
       image_url: inputImageUrl.value.trim(),
@@ -375,7 +383,8 @@ document.addEventListener('DOMContentLoaded', () => {
     inputSlug.value = '';
     inputStrainType.value = 'hybrid';
     inputSortOrder.value = '100';
-    inputDescription.value = '';
+    inputDescriptionEn.value = '';
+    inputDescriptionMm.value = '';
     inputMoodAroma.value = '';
     inputTerpenes.value = '';
     inputImageUrl.value = '';
@@ -402,7 +411,8 @@ document.addEventListener('DOMContentLoaded', () => {
     inputSlug.value = strain.slug || '';
     inputStrainType.value = String(strain.strain_type || 'hybrid').toLowerCase();
     inputSortOrder.value = String(strain.sort_order ?? 100);
-    inputDescription.value = strain.short_description || '';
+    inputDescriptionEn.value = strain.description_en || strain.short_description || '';
+    inputDescriptionMm.value = strain.description_mm || '';
     inputMoodAroma.value = strain.mood_aroma || '';
     inputTerpenes.value = Array.isArray(strain.terpenes) ? strain.terpenes.join(', ') : '';
     inputImageUrl.value = strain.image_url || '';
@@ -657,15 +667,34 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  function hasMissingDescriptionColumns(error) {
+    const details = `${error?.message || ''} ${error?.details || ''} ${error?.hint || ''}`.toLowerCase();
+    return details.includes('description_en') || details.includes('description_mm');
+  }
+
+  async function fetchStrainsWithDescriptionFallback() {
+    let result = await supabase
+      .from('strains')
+      .select(STRAINS_SELECT_WITH_I18N)
+      .order('sort_order', { ascending: true })
+      .order('id', { ascending: true });
+
+    if (result.error && hasMissingDescriptionColumns(result.error)) {
+      result = await supabase
+        .from('strains')
+        .select(STRAINS_SELECT_LEGACY)
+        .order('sort_order', { ascending: true })
+        .order('id', { ascending: true });
+    }
+
+    return result;
+  }
+
   async function fetchStrains() {
     setFormMessage('Loading strains...', '');
     setListLoading(true);
 
-    const { data, error } = await supabase
-      .from('strains')
-      .select('id,slug,name,strain_type,short_description,terpenes,mood_aroma,image_url,image_alt,is_featured,is_published,sort_order,updated_at')
-      .order('sort_order', { ascending: true })
-      .order('id', { ascending: true });
+    const { data, error } = await fetchStrainsWithDescriptionFallback();
 
     if (error) {
       strains = [];
@@ -1075,13 +1104,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const name = inputName.value.trim();
     const rawSlug = inputSlug.value.trim();
     const slug = toSlug(rawSlug || name);
+    const descriptionEn = inputDescriptionEn.value.trim();
+    const descriptionMm = inputDescriptionMm.value.trim();
 
     return {
       name,
       slug,
       strain_type: inputStrainType.value,
       sort_order: Number(inputSortOrder.value || 100),
-      short_description: inputDescription.value.trim(),
+      short_description: descriptionEn,
+      description_en: descriptionEn,
+      description_mm: descriptionMm || null,
       mood_aroma: inputMoodAroma.value.trim(),
       terpenes: parseTerpenes(inputTerpenes.value),
       image_url: inputImageUrl.value.trim() || null,
@@ -1097,6 +1130,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const id = inputId.value.trim();
     const payload = getPayloadFromForm();
+    const legacyPayload = { ...payload };
+    delete legacyPayload.description_en;
+    delete legacyPayload.description_mm;
 
     if (!payload.name || !payload.slug) {
       setFormMessage('', 'Name and slug are required.');
@@ -1122,14 +1158,34 @@ document.addEventListener('DOMContentLoaded', () => {
       query = query.insert(payload);
     }
 
-    const { error } = await query;
+    let savedWithLegacySchema = false;
+    let { error } = await query;
+
+    if (error && hasMissingDescriptionColumns(error)) {
+      query = supabase.from('strains');
+      if (id) {
+        query = query.update(legacyPayload).eq('id', Number(id));
+      } else {
+        query = query.insert(legacyPayload);
+      }
+
+      ({ error } = await query);
+      savedWithLegacySchema = !error;
+    }
 
     if (error) {
       setFormMessage('', `Save failed: ${error.message}`);
       return;
     }
 
-    setFormMessage('Saved.', '');
+    if (savedWithLegacySchema) {
+      setFormMessage('Saved (legacy schema).', '');
+      if (payload.description_mm) {
+        showToast('MM description was not saved because description_mm column is missing. Run the i18n migration SQL first.', 'error');
+      }
+    } else {
+      setFormMessage('Saved.', '');
+    }
     showToast('Strain saved successfully.', 'success');
     await fetchStrains();
 
@@ -1321,7 +1377,7 @@ document.addEventListener('DOMContentLoaded', () => {
       updateDirtyState();
     });
 
-    [inputSlug, inputStrainType, inputSortOrder, inputDescription, inputMoodAroma, inputTerpenes, inputImageAlt].forEach((el) => {
+    [inputSlug, inputStrainType, inputSortOrder, inputDescriptionEn, inputDescriptionMm, inputMoodAroma, inputTerpenes, inputImageAlt].forEach((el) => {
       el.addEventListener('input', updateDirtyState);
       el.addEventListener('change', updateDirtyState);
     });

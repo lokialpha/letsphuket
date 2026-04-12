@@ -1,0 +1,9 @@
+# Local test artifacts
+test-results/
+
+# macOS Finder metadata
+.DS_Store
+
+# Local-only environment overrides
+.env.local
+.env.*.local

@@ -6,6 +6,8 @@ create table if not exists public.strains (
   name text not null,
   strain_type text not null check (lower(strain_type) in ('sativa', 'indica', 'hybrid')),
   short_description text not null,
+  description_en text not null default '',
+  description_mm text,
   terpenes text[] not null default '{}',
   mood_aroma text not null,
   image_url text,
@@ -16,6 +18,18 @@ create table if not exists public.strains (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table if exists public.strains
+  add column if not exists description_en text,
+  add column if not exists description_mm text;
+
+update public.strains
+set description_en = short_description
+where coalesce(btrim(description_en), '') = '';
+
+alter table public.strains
+  alter column description_en set default '',
+  alter column description_en set not null;
 
 create unique index if not exists strains_single_featured_idx
 on public.strains ((1))
@@ -183,23 +197,25 @@ grant insert, update, delete on public.strains, public.merch_items, public.shop_
 grant usage, select on all sequences in schema public to authenticated;
 
 insert into public.strains (
-  slug, name, strain_type, short_description, terpenes, mood_aroma, image_url, image_alt, is_featured, is_published, sort_order
+  slug, name, strain_type, short_description, description_en, description_mm, terpenes, mood_aroma, image_url, image_alt, is_featured, is_published, sort_order
 )
 values
-  ('tropical-cherry', 'Tropical Cherry', 'hybrid', 'Cherry gelato with papaya diesel - sticky resin and a blissy, island glow.', array['Limonene', 'Myrcene'], 'Blissed - Heavy', 'image/default.jpg', 'Tropical Cherry strain flower', false, true, 1),
-  ('subzero', 'Subzero', 'hybrid', 'Frosty gas with minty inhale and a clear, chilled headspace.', array['Caryophyllene', 'Limonene'], 'Icy - Focused', 'image/default.jpg', 'Subzero strain flower', false, true, 2),
-  ('banana-daddy', 'Banana Daddy', 'indica', 'Ripe banana bread and grape candy with a mellow, grinny body feel.', array['Myrcene', 'Linalool'], 'Cozy - Euphoric', 'image/default.jpg', 'Banana Daddy strain flower', false, true, 3),
-  ('blueberry-muffin', 'BlueBerry Muffin', 'hybrid', 'Warm blueberry muffin nose with a creamy finish and calming exhale.', array['Myrcene', 'Pinene'], 'Happy - Relaxed', 'image/default.jpg', 'BlueBerry Muffin strain flower', false, true, 4),
-  ('pink-runtz', 'Pink Runtz', 'hybrid', 'Cotton candy and tropical sherbet with a mellow, floaty lift.', array['Caryophyllene', 'Limonene'], 'Euphoric - Social', 'image/default.jpg', 'Pink Runtz strain flower', false, true, 5),
-  ('tea-time', 'Tea Time', 'hybrid', 'Earl grey, lemon zest, and a smooth calm that stays clear and chatty.', array['Linalool', 'Caryophyllene'], 'Calm - Focused', 'image/Teatime.jpg', 'Tea Time strain flower', true, true, 6),
-  ('lgbtq', 'LGBTQ', 'sativa', 'Rainbow sherbet nose with passionfruit pop and an upbeat social lift.', array['Limonene', 'Terpinolene'], 'Uplifted - Creative', 'image/LGBTQ.jpg', 'LGBTQ strain flower', false, true, 7),
-  ('zupa', 'ZuPa', 'hybrid', 'Tropical candy with creamy gas and a floaty, euphoric body melt.', array['Myrcene', 'Caryophyllene'], 'Relaxed - Euphoric', 'image/Zupa.jpg', 'ZuPa strain flower', false, true, 8),
-  ('neon-icon', 'Neon Icon', 'sativa', 'Electric citrus and guava ice that keeps conversations bright and focused.', array['Ocimene', 'Limonene'], 'Social - Focused', 'image/Neonicon.jpg', 'Neon Icon strain flower', false, true, 9),
-  ('super-boof', 'Super Boof', 'hybrid', 'Tangerine peel with earthy cookie, floaty chatter without the couch-lock.', array['Caryophyllene', 'Linalool'], 'Talkative - Relaxed', 'image/default.jpg', 'Super Boof strain flower', false, true, 10)
+  ('tropical-cherry', 'Tropical Cherry', 'hybrid', 'Cherry gelato with papaya diesel - sticky resin and a blissy, island glow.', 'Cherry gelato with papaya diesel - sticky resin and a blissy, island glow.', null, array['Limonene', 'Myrcene'], 'Blissed - Heavy', 'image/default.jpg', 'Tropical Cherry strain flower', false, true, 1),
+  ('subzero', 'Subzero', 'hybrid', 'Frosty gas with minty inhale and a clear, chilled headspace.', 'Frosty gas with minty inhale and a clear, chilled headspace.', null, array['Caryophyllene', 'Limonene'], 'Icy - Focused', 'image/default.jpg', 'Subzero strain flower', false, true, 2),
+  ('banana-daddy', 'Banana Daddy', 'indica', 'Ripe banana bread and grape candy with a mellow, grinny body feel.', 'Ripe banana bread and grape candy with a mellow, grinny body feel.', null, array['Myrcene', 'Linalool'], 'Cozy - Euphoric', 'image/default.jpg', 'Banana Daddy strain flower', false, true, 3),
+  ('blueberry-muffin', 'BlueBerry Muffin', 'hybrid', 'Warm blueberry muffin nose with a creamy finish and calming exhale.', 'Warm blueberry muffin nose with a creamy finish and calming exhale.', null, array['Myrcene', 'Pinene'], 'Happy - Relaxed', 'image/default.jpg', 'BlueBerry Muffin strain flower', false, true, 4),
+  ('pink-runtz', 'Pink Runtz', 'hybrid', 'Cotton candy and tropical sherbet with a mellow, floaty lift.', 'Cotton candy and tropical sherbet with a mellow, floaty lift.', null, array['Caryophyllene', 'Limonene'], 'Euphoric - Social', 'image/default.jpg', 'Pink Runtz strain flower', false, true, 5),
+  ('tea-time', 'Tea Time', 'hybrid', 'Earl grey, lemon zest, and a smooth calm that stays clear and chatty.', 'Earl grey, lemon zest, and a smooth calm that stays clear and chatty.', null, array['Linalool', 'Caryophyllene'], 'Calm - Focused', 'image/Teatime.jpg', 'Tea Time strain flower', true, true, 6),
+  ('lgbtq', 'LGBTQ', 'sativa', 'Rainbow sherbet nose with passionfruit pop and an upbeat social lift.', 'Rainbow sherbet nose with passionfruit pop and an upbeat social lift.', null, array['Limonene', 'Terpinolene'], 'Uplifted - Creative', 'image/LGBTQ.jpg', 'LGBTQ strain flower', false, true, 7),
+  ('zupa', 'ZuPa', 'hybrid', 'Tropical candy with creamy gas and a floaty, euphoric body melt.', 'Tropical candy with creamy gas and a floaty, euphoric body melt.', null, array['Myrcene', 'Caryophyllene'], 'Relaxed - Euphoric', 'image/Zupa.jpg', 'ZuPa strain flower', false, true, 8),
+  ('neon-icon', 'Neon Icon', 'sativa', 'Electric citrus and guava ice that keeps conversations bright and focused.', 'Electric citrus and guava ice that keeps conversations bright and focused.', null, array['Ocimene', 'Limonene'], 'Social - Focused', 'image/Neonicon.jpg', 'Neon Icon strain flower', false, true, 9),
+  ('super-boof', 'Super Boof', 'hybrid', 'Tangerine peel with earthy cookie, floaty chatter without the couch-lock.', 'Tangerine peel with earthy cookie, floaty chatter without the couch-lock.', null, array['Caryophyllene', 'Linalool'], 'Talkative - Relaxed', 'image/default.jpg', 'Super Boof strain flower', false, true, 10)
 on conflict (slug) do update set
   name = excluded.name,
   strain_type = excluded.strain_type,
   short_description = excluded.short_description,
+  description_en = excluded.description_en,
+  description_mm = excluded.description_mm,
   terpenes = excluded.terpenes,
   mood_aroma = excluded.mood_aroma,
   image_url = excluded.image_url,

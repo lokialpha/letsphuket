@@ -304,8 +304,14 @@
           <h3>Content</h3>
           <div class="section-grid">
             <label class="full-width">
-              Description
+              Description (EN)
               <textarea id="short_description" rows="3" required></textarea>
+            </label>
+
+            <label class="full-width">
+              Description (MM)
+              <textarea id="description_mm" rows="3" placeholder="Optional. If empty, EN will be shown in MM view."></textarea>
+              <small class="muted">If Myanmar text is missing, the website falls back to English.</small>
             </label>
 
             <label>
@@ -369,7 +375,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../supabase-config.js"></script>
-  <script src="admin.js?v=20260412a"></script>
+  <script src="admin.js?v=20260412b"></script>
 
   <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="true"></div>
 

@@ -13,8 +13,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const DEFAULT_SHOP_NAME = "Let's Phuket";
   const SHOP_NAME_CACHE_KEY = 'lp_shop_name_v1';
   const SHOP_NAME_PATTERNS = [/Let['’]s Phuket/g, /Lets Phuket/g];
+  const DEFAULT_DESCRIPTION_LANGUAGE = 'en';
+  const DESCRIPTION_LANGUAGE_OPTIONS = ['en', 'mm'];
   let activeShopName = DEFAULT_SHOP_NAME;
   let brandTextNodes = null;
+  let activeDescriptionLanguage = DEFAULT_DESCRIPTION_LANGUAGE;
+  let activeStrainDetail = null;
+  const descriptionLanguageButtons = Array.from(document.querySelectorAll('[data-description-lang]'));
 
   const FALLBACK_STRAINS = [
     {
@@ -264,6 +269,14 @@ document.addEventListener('DOMContentLoaded', () => {
     page?.scrollTo({ top: 0, behavior: 'smooth' });
   });
 
+  descriptionLanguageButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      setDescriptionLanguage(button.dataset.descriptionLang);
+    });
+  });
+
+  setDescriptionLanguage(DEFAULT_DESCRIPTION_LANGUAGE);
+
   function normalizeType(value) {
     const type = String(value ?? '').toLowerCase();
     if (type === 'sativa' || type === 'indica' || type === 'hybrid') return type;
@@ -273,6 +286,48 @@ document.addEventListener('DOMContentLoaded', () => {
   function formatList(value) {
     if (Array.isArray(value)) return value.filter(Boolean).join(' · ');
     return String(value || '').trim();
+  }
+
+  function normalizeDescriptionLanguage(value) {
+    const language = String(value || '').trim().toLowerCase();
+    return DESCRIPTION_LANGUAGE_OPTIONS.includes(language) ? language : DEFAULT_DESCRIPTION_LANGUAGE;
+  }
+
+  function getEnglishDescription(strain) {
+    const english = String(strain?.description_en || '').trim();
+    if (english) return english;
+    return String(strain?.short_description || '').trim();
+  }
+
+  function getMyanmarDescription(strain) {
+    return String(strain?.description_mm || '').trim();
+  }
+
+  function getDescriptionByLanguage(strain, language) {
+    const english = getEnglishDescription(strain);
+    if (normalizeDescriptionLanguage(language) === 'mm') {
+      return getMyanmarDescription(strain) || english;
+    }
+    return english;
+  }
+
+  function renderDescription(strain) {
+    const description = document.getElementById('strain-description');
+    if (!description || !strain) return;
+    description.textContent = getDescriptionByLanguage(strain, activeDescriptionLanguage);
+  }
+
+  function setDescriptionLanguage(language) {
+    activeDescriptionLanguage = normalizeDescriptionLanguage(language);
+
+    descriptionLanguageButtons.forEach((button) => {
+      const buttonLanguage = normalizeDescriptionLanguage(button.dataset.descriptionLang);
+      const isActive = buttonLanguage === activeDescriptionLanguage;
+      button.classList.toggle('active', isActive);
+      button.setAttribute('aria-pressed', String(isActive));
+    });
+
+    renderDescription(activeStrainDetail);
   }
 
   function resolveImageUrl(value) {
@@ -359,6 +414,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const terpenes = document.getElementById('strain-terpenes');
     const mood = document.getElementById('strain-mood');
 
+    activeStrainDetail = null;
+
     if (name) name.textContent = 'Strain not found';
     if (description) description.textContent = 'We could not find this strain profile.';
     if (terpenes) terpenes.textContent = '-';
@@ -376,12 +433,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const image = document.getElementById('strain-image');
     const type = document.getElementById('strain-type');
     const name = document.getElementById('strain-name');
-    const description = document.getElementById('strain-description');
     const terpenes = document.getElementById('strain-terpenes');
     const mood = document.getElementById('strain-mood');
     const kicker = document.getElementById('detail-kicker');
     const error = document.getElementById('detail-error');
 
+    activeStrainDetail = strain;
     const normalizedType = normalizeType(strain.strain_type);
     const prettyType = normalizedType.charAt(0).toUpperCase() + normalizedType.slice(1);
 
@@ -390,7 +447,7 @@ document.addEventListener('DOMContentLoaded', () => {
       type.textContent = prettyType;
     }
     if (name) name.textContent = strain.name || 'Unnamed strain';
-    if (description) description.textContent = strain.short_description || '';
+    renderDescription(strain);
     if (terpenes) terpenes.textContent = formatList(strain.terpenes) || '-';
     if (mood) mood.textContent = String(strain.mood_aroma || '-').replaceAll('-', '•');
     if (kicker) kicker.textContent = `${prettyType} profile`;
@@ -410,6 +467,35 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const safeName = String(strain.name || 'Strain detail');
     document.title = `${safeName} | ${activeShopName}`;
+  }
+
+  function hasMissingDescriptionColumns(error) {
+    const details = `${error?.message || ''} ${error?.details || ''} ${error?.hint || ''}`.toLowerCase();
+    return details.includes('description_en') || details.includes('description_mm');
+  }
+
+  async function fetchPublishedStrainBySlug(supabase, slug) {
+    const selectWithLanguage = 'slug,name,strain_type,short_description,description_en,description_mm,terpenes,mood_aroma,image_url,image_alt,is_published';
+    const legacySelect = 'slug,name,strain_type,short_description,terpenes,mood_aroma,image_url,image_alt,is_published';
+
+    let result = await supabase
+      .from('strains')
+      .select(selectWithLanguage)
+      .eq('slug', slug)
+      .eq('is_published', true)
+      .maybeSingle();
+
+    if (result.error && hasMissingDescriptionColumns(result.error)) {
+      result = await supabase
+        .from('strains')
+        .select(legacySelect)
+        .eq('slug', slug)
+        .eq('is_published', true)
+        .maybeSingle();
+    }
+
+    if (result.error) throw result.error;
+    return result.data || null;
   }
 
   async function loadStrainDetail() {
@@ -470,14 +556,7 @@ document.addEventListener('DOMContentLoaded', () => {
     })();
 
     try {
-      const { data, error } = await supabase
-        .from('strains')
-        .select('slug,name,strain_type,short_description,terpenes,mood_aroma,image_url,image_alt,is_published')
-        .eq('slug', slug)
-        .eq('is_published', true)
-        .maybeSingle();
-
-      if (error) throw error;
+      const data = await fetchPublishedStrainBySlug(supabase, slug);
 
       if (data) {
         renderStrain(data);

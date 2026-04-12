@@ -41,3 +41,7 @@ Users listed in `admin_users` can write to `strains`, `merch_items`, and `shop_p
 - Keep `is_published=true` for public items.
 - Set exactly one `strains.is_featured=true` for hero content.
 - Control display order via `sort_order`.
+
+## 5) Incremental migrations (existing projects)
+If your project was created before bilingual strain descriptions, paste and run the SQL from:
+- [`migrations/20260412_add_strain_description_i18n.sql`](./migrations/20260412_add_strain_description_i18n.sql)

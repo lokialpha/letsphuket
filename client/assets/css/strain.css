@@ -46,6 +46,44 @@
   font-size: clamp(1.9rem, 3.2vw, 2.7rem);
 }
 
+.detail-description-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 4px;
+}
+
+.detail-lang-btn {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.55px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.detail-lang-btn:hover {
+  color: var(--text);
+}
+
+.detail-lang-btn.active {
+  color: var(--accent);
+}
+
+.detail-lang-btn:focus-visible {
+  outline: 2px solid rgba(98, 243, 197, 0.85);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+.detail-lang-separator {
+  color: var(--muted);
+  opacity: 0.85;
+}
+
 .detail-description {
   color: var(--muted);
   font-size: 1.02rem;
